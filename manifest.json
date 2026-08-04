@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "DraftPilot",
+  "version": "0.1.0",
+  "description": "Export your Sleeper Fantasy Football draft room to CSV.",
+  "action": {
+    "default_popup": "popup/popup.html"
+  },
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://sleeper.com/draft/*",
+    "https://*.sleeper.com/draft/*",
+    "https://sleeper.app/draft/*",
+    "https://*.sleeper.app/draft/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://sleeper.com/draft/*",
+        "https://*.sleeper.com/draft/*",
+        "https://sleeper.app/draft/*",
+        "https://*.sleeper.app/draft/*"
+      ],
+      "js": [
+        "utils/logger.js",
+        "utils/storage.js",
+        "utils/csv.js",
+        "content/parser.js",
+        "content/observer.js",
+        "content/exporter.js",
+        "content/ui.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
