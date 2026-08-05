@@ -9,6 +9,11 @@
     nameWrapper: '.name-wrapper',
     position: '.position',
     team: '.team',
+    // Auction drafts add an "auction" modifier class to this container; snake
+    // (and other non-auction) drafts don't. This is the only reliable signal
+    // for draft type -- the header text for the .adp column is empty in both
+    // cases, so it can't be used to distinguish them.
+    auctionIndicator: '.bottom-container.auction',
   };
 
   // Maps our normalized field names to Sleeper's stat-cell class names.
@@ -69,18 +74,30 @@
     return raw;
   }
 
+  /** Detects whether the current draft is an auction or a snake/linear draft. */
+  function detectDraftType(root = document) {
+    return root.querySelector(SELECTORS.auctionIndicator) ? 'auction' : 'snake';
+  }
+
   /**
    * Normalizes a raw row into the DraftPilot player schema.
    * Every field is present; missing data becomes null rather than throwing.
+   *
+   * The `.adp` column means different things depending on draft type: a
+   * dollar value in auction drafts, average draft position everywhere else.
+   * `draftType` decides which normalized field the raw value is routed into,
+   * so the other one is always null rather than mislabeled.
    */
-  function normalizePlayer(raw) {
+  function normalizePlayer(raw, draftType) {
+    const adpValue = toNumberOrNull(raw.adp);
     return {
       rank: toNumberOrNull(raw.rank),
       playerName: raw.playerName || null,
       position: raw.position || null,
       team: raw.team || null,
       bye: toNumberOrNull(raw.bye),
-      projectedAuctionValue: toNumberOrNull(raw.adp),
+      projectedAuctionValue: draftType === 'auction' ? adpValue : null,
+      averageDraftPosition: draftType === 'auction' ? null : adpValue,
       projectedFantasyPoints: toNumberOrNull(raw.projPts),
       averageFantasyPoints: toNumberOrNull(raw.projAvg),
       passingAttempts: toNumberOrNull(raw.passAtt),
@@ -97,8 +114,8 @@
     };
   }
 
-  function parseRow(rowEl) {
-    return normalizePlayer(extractRawRow(rowEl));
+  function parseRow(rowEl, draftType) {
+    return normalizePlayer(extractRawRow(rowEl), draftType);
   }
 
   function findGrid(root = document) {
@@ -110,5 +127,5 @@
   }
 
   global.DraftPilot = global.DraftPilot || {};
-  global.DraftPilot.parser = { parseRow, findGrid, findRows, SELECTORS };
+  global.DraftPilot.parser = { parseRow, findGrid, findRows, detectDraftType, SELECTORS };
 })(typeof window !== 'undefined' ? window : globalThis);

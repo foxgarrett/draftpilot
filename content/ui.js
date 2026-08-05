@@ -2,6 +2,7 @@
   const { logger, parser, observer, exporter, storage } = global.DraftPilot;
 
   const BANNER_ID = 'draftpilot-banner';
+  const MAX_PLAYERS = 500;
 
   function showBanner(text) {
     let banner = document.getElementById(BANNER_ID);
@@ -43,18 +44,22 @@
 
     showBanner('DraftPilot: scanning draft board…');
 
+    const draftType = parser.detectDraftType();
+    logger.debug('Detected draft type', draftType);
+
     const players = await observer.autoScrollAndCollect({
       grid,
       findRows: parser.findRows,
-      parseRow: parser.parseRow,
+      parseRow: (rowEl) => parser.parseRow(rowEl, draftType),
+      maxPlayers: MAX_PLAYERS,
       onProgress: ({ collected }) => {
         showBanner(`DraftPilot: collected ${collected} players…`);
         if (onCollected) onCollected(collected);
       },
     });
 
-    exporter.downloadCSV(players);
-    await storage.set('lastExport', { timestamp: Date.now(), count: players.length });
+    exporter.downloadCSV(players, { draftType });
+    await storage.set('lastExport', { timestamp: Date.now(), count: players.length, draftType });
 
     showBanner(`DraftPilot: exported ${players.length} players ✓`);
     setTimeout(hideBanner, 3000);

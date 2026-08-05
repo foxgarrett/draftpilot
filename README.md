@@ -90,14 +90,25 @@ Every player row becomes:
 ```js
 {
   rank, playerName, position, team, bye,
-  projectedAuctionValue, projectedFantasyPoints, averageFantasyPoints,
+  projectedAuctionValue, averageDraftPosition,
+  projectedFantasyPoints, averageFantasyPoints,
   passingAttempts, passingYards, passingTD,
   rushingAttempts, rushingYards, rushingTD,
   receptions, receivingYards, receivingTD,
 }
 ```
 
-Missing data is always `null`, never a thrown error.
+Missing data is always `null`, never a thrown error. The exported CSV uses
+human-readable column headers (e.g. `Projected Auction Value`) mapped from
+these keys in `content/exporter.js`; the keys themselves stay camelCase for
+code that consumes the player objects directly.
+
+**Draft-type-dependent fields:** Sleeper reuses the same `.adp` column for two
+different stats depending on draft type -- a dollar estimate in auction
+drafts, average draft position everywhere else (snake, linear, etc). DraftPilot
+detects the draft type from the DOM and populates exactly one of
+`projectedAuctionValue` / `averageDraftPosition` per export; the other is
+always `null` rather than mislabeled.
 
 **Known gap:** Sleeper's draft board exposes receiving *targets*, not
 receptions/catches, so `receptions` is currently always `null`. If receptions

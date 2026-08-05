@@ -54,6 +54,7 @@
     stableThreshold = 3,
     maxIterations = 2000,
     timeoutMs = 120000,
+    maxPlayers = Infinity,
   }) {
     if (!grid) {
       throw createError(
@@ -88,6 +89,11 @@
       const maxRank = collected.size ? Math.max(...collected.keys()) : 0;
       if (onProgress) onProgress({ collected: collected.size, maxRank });
 
+      // Ranks are assigned top-down by Sleeper, so once the highest one we've
+      // seen reaches the limit, everything above the cutoff is guaranteed to
+      // already be in the map -- no need to keep scrolling.
+      if (maxRank >= maxPlayers) break;
+
       if (maxRank > 0 && maxRank === lastMaxRank) {
         stableCount++;
         if (stableCount >= stableThreshold) break;
@@ -104,7 +110,9 @@
       throw createError('NO_PLAYERS_FOUND', 'No players were found in the draft board.');
     }
 
-    return Array.from(collected.values()).sort((a, b) => a.rank - b.rank);
+    return Array.from(collected.values())
+      .sort((a, b) => a.rank - b.rank)
+      .slice(0, maxPlayers);
   }
 
   global.DraftPilot = global.DraftPilot || {};
