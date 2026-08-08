@@ -1,5 +1,5 @@
 (function (global) {
-  const PREFIX = '[DraftPilot]';
+  const PREFIX = '[Draft Pilot]';
   let enabled = true;
 
   function setEnabled(value) {

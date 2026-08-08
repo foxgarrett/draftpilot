@@ -135,7 +135,7 @@
       );
     }
 
-    showBanner('DraftPilot: scanning draft board…');
+    showBanner('Draft Pilot: scanning draft board…');
 
     const draftType = parser.detectDraftType();
     const draftId = extractDraftId();
@@ -164,7 +164,7 @@
         parseRow: (rowEl) => parser.parseRow(rowEl, draftType),
         maxPlayers: MAX_PLAYERS,
         onProgress: ({ collected }) => {
-          showBanner(`DraftPilot: collected ${collected} players…`);
+          showBanner(`Draft Pilot: collected ${collected} players…`);
           if (onCollected) onCollected(collected);
         },
       });
@@ -214,7 +214,7 @@
     exporter.downloadCSV(players, { draftType });
     await storage.set('lastExport', { timestamp: Date.now(), count: players.length, draftType });
 
-    showBanner(`DraftPilot: exported ${players.length} players ✓`);
+    showBanner(`Draft Pilot: exported ${players.length} players ✓`);
     setTimeout(hideBanner, 3000);
 
     return players.length;
@@ -232,7 +232,7 @@
         // Prefer the plain-English message sleeperApi attaches; fall back
         // to the raw error message for anything thrown by our own code.
         const message = err.userMessage || err.message || 'Export failed.';
-        showBanner(`DraftPilot: ${message}`);
+        showBanner(`Draft Pilot: ${message}`);
         setTimeout(hideBanner, 4000);
         sendResponse({ success: false, error: message, code: err.code });
       });

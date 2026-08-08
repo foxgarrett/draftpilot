@@ -105,7 +105,7 @@
       if (/Receiving end does not exist|Could not establish connection/i.test(raw)) {
         setStatus(
           status,
-          'DraftPilot isn\'t running on this tab yet. Reload the draft page and try again.',
+          "Draft Pilot isn't running on this tab yet. Reload the draft page and try again.",
           'error'
         );
       } else {

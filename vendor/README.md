@@ -36,7 +36,7 @@ https://github.com/gitbrent/xlsx-js-style/tree/v1.2.0 — the entire
 library lives under `src/` there and can be inspected without any
 build step.
 
-Note for AMO reviewers: no build step is applied by DraftPilot to this
+Note for AMO reviewers: no build step is applied by Draft Pilot to this
 vendor file. It is downloaded verbatim from jsDelivr's CDN mirror of the
 xlsx-js-style npm package at the version pinned above and committed to
 this repo as-is. The upstream repo link is the authoritative unminified

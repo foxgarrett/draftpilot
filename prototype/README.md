@@ -1,4 +1,4 @@
-# DraftPilot analysis prototype
+# Draft Pilot analysis prototype
 
 Standalone Node scripts for iterating on the pre-draft analysis engine
 outside the extension. Once each analyzer stabilizes here, its pure logic

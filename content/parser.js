@@ -90,7 +90,7 @@
   }
 
   /**
-   * Normalizes a raw row into the DraftPilot player schema.
+   * Normalizes a raw row into the Draft Pilot player schema.
    * Every field is present; missing data becomes null rather than throwing.
    *
    * The `.adp` column means different things depending on draft type: a

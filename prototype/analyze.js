@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * DraftPilot analysis prototype runner.
+ * Draft Pilot analysis prototype runner.
  *
  *   node prototype/analyze.js [sleeper-username]
  *

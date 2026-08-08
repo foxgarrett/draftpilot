@@ -1,4 +1,4 @@
-# DraftPilot (v0.2)
+# Draft Pilot (v0.2)
 
 A browser extension that exports Sleeper Fantasy Football draft data to CSV.
 Two exports today: the currently open draft room's player list (with
@@ -42,7 +42,7 @@ CSV Export   Future Features
 ### Export the current draft room's player list
 
 1. Open a Sleeper draft room (`sleeper.com/draft/...` or `sleeper.app/draft/...`).
-2. Click the DraftPilot toolbar icon.
+2. Click the Draft Pilot toolbar icon.
 3. Click **Export Draft Room**.
 4. The extension auto-scrolls the player list, collects the top 500 available
    players, and downloads `SleeperDraft_YYYY-MM-DD_HH-MM.csv`.
@@ -59,7 +59,7 @@ CSV + past-drafts export to Claude/GPT for smarter predictions.
 
 ### Export past drafts' pick history
 
-1. Click the DraftPilot toolbar icon (from anywhere — no need to be on Sleeper).
+1. Click the Draft Pilot toolbar icon (from anywhere — no need to be on Sleeper).
 2. Under **Past Drafts**, enter your Sleeper username and click **Load Past Drafts**
    (the current season's draft is not listed here — export it from the "Current
    Draft Room" flow above while the draft page is open).
@@ -145,7 +145,7 @@ code that consumes the player objects directly.
 
 **Draft-type-dependent fields:** Sleeper reuses the same `.adp` column for two
 different stats depending on draft type -- a dollar estimate in auction
-drafts, average draft position everywhere else (snake, linear, etc). DraftPilot
+drafts, average draft position everywhere else (snake, linear, etc). Draft Pilot
 detects the draft type from the DOM and populates exactly one of
 `projectedAuctionValue` / `averageDraftPosition` per export; the other is
 always `null` rather than mislabeled.
@@ -180,7 +180,7 @@ above.
 ## Development
 
 No build step or bundler. Content scripts are classic (non-module) scripts
-that attach their exports to a shared `window.DraftPilot` namespace, loaded
+that attach their exports to a shared `window.Draft Pilot` namespace, loaded
 in dependency order via `manifest.json`'s `content_scripts.js` array. Reload
 the unpacked extension after editing any file.
 

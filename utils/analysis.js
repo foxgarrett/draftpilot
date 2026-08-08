@@ -1,5 +1,5 @@
 /**
- * DraftPilot analysis engine.
+ * Draft Pilot analysis engine.
  *
  * Pure functions -- no I/O, no globals, no framework coupling. Consumed
  * by both the extension popup and the Node prototype runner via a shared
