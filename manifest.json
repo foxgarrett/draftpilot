@@ -6,6 +6,12 @@
   "action": {
     "default_popup": "popup/popup.html"
   },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "draftpilot@foxgarrett.github.io",
+      "strict_min_version": "109.0"
+    }
+  },
   "permissions": ["storage"],
   "host_permissions": [
     "https://sleeper.com/draft/*",
