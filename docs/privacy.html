@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DraftPilot — Privacy Policy</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #ffffff;
+      --text: #1a1a2e;
+      --muted: #5a5a7a;
+      --border: #e5e7ee;
+      --accent: #4f8cff;
+      --code-bg: #f5f6fb;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #12122a;
+        --text: #e8e8f5;
+        --muted: #a0a0b8;
+        --border: #2a2a44;
+        --code-bg: #1a1a2e;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 48px 24px 96px;
+    }
+    header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 24px;
+      margin-bottom: 32px;
+    }
+    h1 {
+      font-size: 28px;
+      margin: 0 0 4px;
+    }
+    .subtitle {
+      color: var(--muted);
+      font-size: 14px;
+      margin: 0;
+    }
+    h2 {
+      font-size: 18px;
+      margin: 40px 0 12px;
+      padding-top: 8px;
+    }
+    h3 {
+      font-size: 15px;
+      margin: 24px 0 8px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    p, li { font-size: 15px; }
+    ul { padding-left: 20px; }
+    li { margin-bottom: 6px; }
+    code {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+      font-size: 13px;
+    }
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    a:hover { text-decoration: underline; }
+    .callout {
+      background: var(--code-bg);
+      border-left: 3px solid var(--accent);
+      padding: 12px 16px;
+      margin: 20px 0;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    footer {
+      margin-top: 64px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>DraftPilot — Privacy Policy</h1>
+      <p class="subtitle">Last updated: 2026-08-08</p>
+    </header>
+
+    <p>
+      DraftPilot is a browser extension that exports Sleeper Fantasy Football
+      draft data to CSV and XLSX files, and computes league-specific analysis
+      from your past drafts. This document describes exactly what data the
+      extension touches, where that data lives, and what it never does.
+    </p>
+
+    <div class="callout">
+      <strong>Summary:</strong> DraftPilot has no backend and no analytics.
+      Everything it processes stays on your device or is a request to
+      Sleeper's public read-only API. It doesn't collect personal
+      information, track usage, or share anything with third parties beyond
+      Sleeper's own API.
+    </div>
+
+    <h2>What data DraftPilot stores on your device</h2>
+    <p>
+      The extension uses <code>chrome.storage.local</code> (or the Firefox
+      equivalent), which lives entirely in your browser profile. No data
+      leaves your device from this storage. Specifically, DraftPilot saves:
+    </p>
+    <ul>
+      <li>
+        <strong>Your Sleeper username</strong> — remembered so you don't have
+        to re-enter it every time you open the popup.
+      </li>
+      <li>
+        <strong>Cached analysis of your past drafts</strong> — computed tier
+        prices, rookie multipliers, and the list of your leagues. Refreshed
+        when you click <em>Sync League Data</em>.
+      </li>
+      <li>
+        <strong>Timestamp and player count of your most recent exports</strong>
+        — used only to show "Last export: N players (2h ago)" in the popup.
+      </li>
+    </ul>
+    <p>
+      All of the above is removed automatically when you uninstall the
+      extension, or manually via your browser's extension settings.
+    </p>
+
+    <h2>What data DraftPilot transmits</h2>
+    <p>
+      DraftPilot makes HTTPS requests to exactly one external service:
+      <a href="https://docs.sleeper.com/">Sleeper's public API</a> at
+      <code>api.sleeper.app</code>. All requests are read-only <code>GET</code>
+      calls to public endpoints that require no authentication. Specifically:
+    </p>
+    <ul>
+      <li><code>GET /v1/user/{username}</code> — resolve a public Sleeper username to a user ID</li>
+      <li><code>GET /v1/user/{id}/leagues/nfl/{season}</code> — list a user's leagues per season</li>
+      <li><code>GET /v1/league/{id}</code> and <code>/league/{id}/users</code> — read league settings and member display names</li>
+      <li><code>GET /v1/draft/{id}</code> and <code>/draft/{id}/picks</code> — read draft settings and pick history</li>
+    </ul>
+    <p>
+      These requests contain only publicly available identifiers you already
+      have in the URL of your Sleeper draft pages. DraftPilot never sends
+      your data anywhere else.
+    </p>
+
+    <h2>What data DraftPilot reads from Sleeper draft pages</h2>
+    <p>
+      When you click <em>Export Draft Room</em> on a Sleeper draft URL
+      (<code>sleeper.com/draft/*</code> or <code>sleeper.app/draft/*</code>),
+      DraftPilot's content script reads the player list rendered on that
+      page — projections, positions, teams, byes, stats, ranks — and
+      packages it into a CSV downloaded to your computer. That reading
+      happens locally in your browser. Nothing is transmitted.
+    </p>
+
+    <h2>Files downloaded by DraftPilot</h2>
+    <p>
+      All exports are written directly to your browser's default Downloads
+      folder using a standard <code>&lt;a download&gt;</code> link. No
+      cloud upload, no server-side processing. The files contain only the
+      data you asked to export.
+    </p>
+
+    <h2>What DraftPilot does <em>not</em> do</h2>
+    <ul>
+      <li>No analytics, telemetry, error reporting, or usage tracking of any kind</li>
+      <li>No advertising, ad IDs, or marketing pixels</li>
+      <li>No cookies set by the extension</li>
+      <li>No third-party servers contacted other than Sleeper's public API</li>
+      <li>No account creation or login collected by DraftPilot itself</li>
+      <li>No personal data (email, phone, real name, payment info) — DraftPilot never asks for any of it</li>
+      <li>No selling, sharing, or transferring of any data to anyone</li>
+    </ul>
+
+    <h2>Permissions the extension requests</h2>
+    <ul>
+      <li>
+        <code>storage</code> — used only for the local cache described above.
+      </li>
+      <li>
+        <code>host_permissions</code> for <code>sleeper.com/draft/*</code>,
+        <code>sleeper.app/draft/*</code>, and <code>api.sleeper.app/*</code>
+        — used only to run the extension's content scripts on Sleeper draft
+        pages and to call Sleeper's public API. No wildcard site access.
+      </li>
+    </ul>
+
+    <h2>Your controls</h2>
+    <ul>
+      <li>
+        <strong>Uninstall the extension</strong> to permanently remove
+        everything DraftPilot has stored locally.
+      </li>
+      <li>
+        <strong>Clear extension storage</strong> at any time via your
+        browser's extensions page.
+      </li>
+      <li>
+        <strong>Re-sync</strong> at any time to replace the cached analysis
+        with a fresh copy from Sleeper.
+      </li>
+    </ul>
+
+    <h2>Children</h2>
+    <p>
+      DraftPilot is not designed for or directed at children under 13. It
+      collects no personal information about anyone, children or otherwise.
+    </p>
+
+    <h2>Changes to this policy</h2>
+    <p>
+      If DraftPilot's data practices ever change, this document will be
+      updated with a new <em>Last updated</em> date. Because the extension
+      is open source, any code change that affects data handling is visible
+      in the repository's commit history.
+    </p>
+
+    <h2>Contact</h2>
+    <p>
+      Questions or concerns: open an issue at
+      <a href="https://github.com/foxgarrett/draftpilot/issues">
+        github.com/foxgarrett/draftpilot/issues
+      </a>.
+    </p>
+
+    <footer>
+      DraftPilot is an independent, open-source project. It is not
+      affiliated with, endorsed by, or sponsored by Sleeper, Blitz Studios,
+      or the NFL. Source code:
+      <a href="https://github.com/foxgarrett/draftpilot">github.com/foxgarrett/draftpilot</a>.
+    </footer>
+  </main>
+</body>
+</html>
