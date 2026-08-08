@@ -312,7 +312,11 @@
         }
         rowsBySeason.set(league.season, seasonRows);
       } catch (err) {
-        failures.push({ leagueName: league.leagueName, season: league.season, error: err.message });
+        failures.push({
+          leagueName: league.leagueName,
+          season: league.season,
+          error: err.userMessage || err.message,
+        });
       }
     }
 
@@ -674,7 +678,11 @@
           );
         }
       } catch (err) {
-        failures.push({ leagueName: league.leagueName, season: league.season, error: err.message });
+        failures.push({
+          leagueName: league.leagueName,
+          season: league.season,
+          error: err.userMessage || err.message,
+        });
       }
     }
 
@@ -702,6 +710,7 @@
    * background analysis pass. */
   async function cacheLeagueAnalysis(leagues, { onProgress } = {}) {
     const draftSummaries = [];
+    const failures = [];
     for (let i = 0; i < leagues.length; i++) {
       const league = leagues[i];
       if (onProgress) onProgress({ done: i, total: leagues.length, leagueName: league.leagueName });
@@ -709,12 +718,22 @@
         const loaded = await loadDraftPicks(league);
         draftSummaries.push(loaded.draftSummary);
       } catch (err) {
-        // Skip -- the export-all flow will surface any real errors.
+        // Track per-league failures so the popup can tell the user WHICH
+        // leagues didn't load -- not just a silent "N failed" total.
+        failures.push({
+          leagueName: league.leagueName,
+          season: league.season,
+          message: err.userMessage || err.message,
+        });
       }
     }
     if (onProgress) onProgress({ done: leagues.length, total: leagues.length });
 
-    if (!draftSummaries.length) return null;
+    if (!draftSummaries.length) {
+      // Total failure -- return a shape the caller can inspect rather
+      // than null (which loses failure context).
+      return { failures, cachedAt: null, seasonsAnalyzed: 0 };
+    }
 
     const formatState = analysis.detectFormatChanges(draftSummaries);
     const effectiveDrafts = formatState.hasChanges
@@ -731,6 +750,7 @@
       seasonsAnalyzed: effectiveDrafts.length,
       hasFormatChanges: formatState.hasChanges,
       totalDraftsFound: draftSummaries.length,
+      failures,
       // The list the popup renders in "Individual drafts" -- cached so the
       // popup can restore this section without re-hitting the API on open.
       leagues: leagues.map((l) => ({

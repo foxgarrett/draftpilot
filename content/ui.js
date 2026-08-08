@@ -229,9 +229,12 @@
       .then((count) => sendResponse({ success: true, count }))
       .catch((err) => {
         logger.error('Export failed', err);
-        showBanner(`DraftPilot error: ${err.message}`);
+        // Prefer the plain-English message sleeperApi attaches; fall back
+        // to the raw error message for anything thrown by our own code.
+        const message = err.userMessage || err.message || 'Export failed.';
+        showBanner(`DraftPilot: ${message}`);
         setTimeout(hideBanner, 4000);
-        sendResponse({ success: false, error: err.message, code: err.code });
+        sendResponse({ success: false, error: message, code: err.code });
       });
 
     return true; // keep the message channel open for the async sendResponse above

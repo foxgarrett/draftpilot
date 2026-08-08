@@ -28,6 +28,14 @@
     el.className = 'status' + (kind ? ` ${kind}` : '');
   }
 
+  /** Pull the friendliest message from an error thrown anywhere in the
+   * stack. sleeperApi.js adds `userMessage`; everything else falls back
+   * to the raw `.message`. */
+  function friendlyErrorMessage(err) {
+    if (!err) return 'Something went wrong.';
+    return err.userMessage || err.message || String(err);
+  }
+
   function relativeTime(ts) {
     const seconds = Math.round((Date.now() - ts) / 1000);
     if (seconds < 60) return 'just now';
@@ -90,7 +98,19 @@
         setStatus(status, (response && response.error) || 'Export failed.', 'error');
       }
     } catch (err) {
-      setStatus(status, 'Could not reach the draft page. Reload it and try again.', 'error');
+      // Distinguish "content script never loaded" (extension installed
+      // after page loaded, or Sleeper's SPA navigated without a full
+      // reload) from an actual export error thrown by our own code.
+      const raw = err && err.message ? err.message : '';
+      if (/Receiving end does not exist|Could not establish connection/i.test(raw)) {
+        setStatus(
+          status,
+          'DraftPilot isn\'t running on this tab yet. Reload the draft page and try again.',
+          'error'
+        );
+      } else {
+        setStatus(status, `Export failed: ${friendlyErrorMessage(err)}`, 'error');
+      }
     } finally {
       exportBtn.disabled = false;
     }
@@ -134,7 +154,7 @@
           } catch (err) {
             btn.disabled = false;
             btn.textContent = 'Retry';
-            setStatus(pastStatus, `Export failed: ${err.message}`, 'error');
+            setStatus(pastStatus, `Export failed: ${friendlyErrorMessage(err)}`, 'error');
           }
         });
 
@@ -164,8 +184,14 @@
   }
 
   function renderSyncStatus(cache) {
-    if (!cache) {
-      setStatus(syncStatus, '');
+    if (!cache || !cache.cachedAt) {
+      // First-time state: guide the user toward the action instead of
+      // leaving the status line blank.
+      setStatus(
+        syncStatus,
+        "Not synced yet. Enter your username and click Sync to unlock league-specific analysis.",
+        'subtle'
+      );
       return;
     }
     const formatNote = cache.hasFormatChanges
@@ -222,11 +248,36 @@
         },
       });
 
+      // Complete failure: nothing loaded. Surface which leagues failed
+      // instead of a generic "Sync failed" so the user knows what to try.
+      if (!cache || !cache.seasonsAnalyzed) {
+        const failures = (cache && cache.failures) || [];
+        const detail = failures.length
+          ? ` (${failures.length} draft${failures.length === 1 ? '' : 's'} couldn't be loaded — first error: ${failures[0].message})`
+          : '';
+        setStatus(syncStatus, `Sync couldn't complete${detail}`, 'error');
+        return;
+      }
+
       showPastSection(leagues);
       renderEnrichmentStatus(cache);
       renderSyncStatus(cache);
+
+      // Partial failure: some leagues loaded, some didn't. Show a
+      // warning-style success so the user knows their analysis is
+      // incomplete and can act on it.
+      if (cache.failures && cache.failures.length) {
+        const failedNames = cache.failures
+          .map((f) => `${f.season} · ${f.leagueName}`)
+          .join(', ');
+        setStatus(
+          syncStatus,
+          `✓ Synced with warnings — couldn't load: ${failedNames}. Insights based on the ${cache.seasonsAnalyzed} draft${cache.seasonsAnalyzed === 1 ? '' : 's'} that did load.`,
+          'error'
+        );
+      }
     } catch (err) {
-      setStatus(syncStatus, `Sync failed: ${err.message}`, 'error');
+      setStatus(syncStatus, `Sync failed: ${friendlyErrorMessage(err)}`, 'error');
     } finally {
       syncBtn.disabled = false;
       syncBtn.textContent = originalLabel;
@@ -258,7 +309,7 @@
         'success'
       );
     } catch (err) {
-      setStatus(pastStatus, `Combined CSV export failed: ${err.message}`, 'error');
+      setStatus(pastStatus, `Combined CSV export failed: ${friendlyErrorMessage(err)}`, 'error');
     } finally {
       exportAllCsvBtn.disabled = false;
       exportAllCsvBtn.textContent = originalLabel;
@@ -291,7 +342,7 @@
         'success'
       );
     } catch (err) {
-      setStatus(pastStatus, `Combined export failed: ${err.message}`, 'error');
+      setStatus(pastStatus, `Combined export failed: ${friendlyErrorMessage(err)}`, 'error');
     } finally {
       exportAllBtn.disabled = false;
       exportAllBtn.textContent = originalLabel;
@@ -315,6 +366,7 @@
         renderEnrichmentStatus(cache);
         if (cache.leagues && cache.leagues.length) showPastSection(cache.leagues);
       } else {
+        renderSyncStatus(null);
         renderEnrichmentStatus(null);
       }
       if (lastExport && lastExport.timestamp) {
