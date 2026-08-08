@@ -14,6 +14,11 @@
     // for draft type -- the header text for the .adp column is empty in both
     // cases, so it can't be used to distinguish them.
     auctionIndicator: '.bottom-container.auction',
+    // "Show Drafted" toggle in the filter row. Hidden by default; when off,
+    // keepers and drafted players are excluded from the player list, which
+    // means the export would miss them. We flip it on before scanning.
+    showDraftedFilter: '.drafted-filter.filter-button',
+    showDraftedCheckbox: '.drafted-filter.filter-button .custom-checkbox',
   };
 
   // Maps our normalized field names to Sleeper's stat-cell class names.
@@ -65,6 +70,11 @@
       playerName: nameWrapper ? directText(nameWrapper) : null,
       position: positionEl ? directText(positionEl) : null,
       team: row.querySelector(SELECTORS.team)?.textContent.trim() ?? null,
+      // Sleeper adds "drafted" to the row class for both keepers (set
+      // pre-draft) and picks that have already happened in a live draft.
+      // We can't tell which from the class alone -- the /picks API is used
+      // to disambiguate downstream.
+      isDrafted: row.classList.contains('drafted'),
     };
 
     for (const [field, className] of Object.entries(STAT_CELLS)) {
@@ -96,6 +106,7 @@
       position: raw.position || null,
       team: raw.team || null,
       bye: toNumberOrNull(raw.bye),
+      isDrafted: !!raw.isDrafted,
       projectedAuctionValue: draftType === 'auction' ? adpValue : null,
       averageDraftPosition: draftType === 'auction' ? null : adpValue,
       projectedFantasyPoints: toNumberOrNull(raw.projPts),
@@ -126,6 +137,34 @@
     return Array.from(root.querySelectorAll(SELECTORS.row));
   }
 
+  /** Reads the current on/off state of the "Show Drafted" filter. Returns
+   * true if enabled, false if disabled, null if the control isn't present
+   * (some draft views may not have it). */
+  function getShowDraftedState(root = document) {
+    const cb = root.querySelector(SELECTORS.showDraftedCheckbox);
+    if (!cb) return null;
+    return cb.className.split(/\s+/).includes('checked');
+  }
+
+  /** Clicks the "Show Drafted" filter if its current state doesn't match
+   * the desired state. Returns true if a click happened. */
+  function setShowDrafted(desired, root = document) {
+    const current = getShowDraftedState(root);
+    if (current == null || current === desired) return false;
+    const clickable = root.querySelector(SELECTORS.showDraftedFilter);
+    if (!clickable) return false;
+    clickable.click();
+    return true;
+  }
+
   global.DraftPilot = global.DraftPilot || {};
-  global.DraftPilot.parser = { parseRow, findGrid, findRows, detectDraftType, SELECTORS };
+  global.DraftPilot.parser = {
+    parseRow,
+    findGrid,
+    findRows,
+    detectDraftType,
+    getShowDraftedState,
+    setShowDrafted,
+    SELECTORS,
+  };
 })(typeof window !== 'undefined' ? window : globalThis);

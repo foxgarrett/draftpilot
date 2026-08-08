@@ -1,0 +1,5 @@
+# Generated analyzer outputs -- rebuilt on every prototype/analyze.js run.
+prototype/out/
+
+# Local scratch
+.DS_Store

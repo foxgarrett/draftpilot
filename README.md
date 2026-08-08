@@ -1,10 +1,12 @@
-# DraftPilot (v0.1)
+# DraftPilot (v0.2)
 
-A browser extension that exports the currently visible Sleeper Fantasy Football
-draft room to CSV. This is the first slice of a larger tool — the parser output
-is a stable, normalized player schema that later features (auction calculator,
-keeper values, custom rankings, live recommendations) can build on without
-touching the extraction logic.
+A browser extension that exports Sleeper Fantasy Football draft data to CSV.
+Two exports today: the currently open draft room's player list (with
+projections, stats, and auction/ADP), and any of your past completed drafts'
+full pick history (drafter, price, keeper flag, etc). Parser output is a
+stable, normalized schema so later features — auction inflation calculator,
+per-team spending analysis, live recommendations — can build on it without
+touching the extraction layer.
 
 ```
 Sleeper Draft Room
@@ -37,23 +39,57 @@ CSV Export   Future Features
 
 ## Usage
 
+### Export the current draft room's player list
+
 1. Open a Sleeper draft room (`sleeper.com/draft/...` or `sleeper.app/draft/...`).
 2. Click the DraftPilot toolbar icon.
 3. Click **Export Draft Room**.
-4. The extension auto-scrolls the player list, collects every player, and
-   downloads `SleeperDraft_YYYY-MM-DD_HH-MM.csv`.
+4. The extension auto-scrolls the player list, collects the top 500 available
+   players, and downloads `SleeperDraft_YYYY-MM-DD_HH-MM.csv`.
 
-No manual scrolling or configuration needed.
+Works pre-draft, mid-draft, and on auction / snake / dynasty formats. Drafted
+players correctly disappear mid-draft.
+
+**Bonus for auction drafts:** if you've loaded your past drafts (see below),
+the CSV also includes a **League-Adjusted Value** column — Sleeper's current
+projection re-priced to what players at that position/tier have historically
+gone for in your league. Purely a math baseline, no narrative reasoning
+(injuries, breakouts, coaching changes). Users who want that layer hand the
+CSV + past-drafts export to Claude/GPT for smarter predictions.
+
+### Export past drafts' pick history
+
+1. Click the DraftPilot toolbar icon (from anywhere — no need to be on Sleeper).
+2. Under **Past Drafts**, enter your Sleeper username and click **Load Past Drafts**
+   (the current season's draft is not listed here — export it from the "Current
+   Draft Room" flow above while the draft page is open).
+3. Pick a single draft from the list and click **Export** — downloads
+   `SleeperDraft_{LeagueName}_{Season}_YYYY-MM-DD_HH-MM.csv`.
+4. Or click **Export All (one tab per season)** to download every draft in
+   one `.xlsx` workbook, with one sheet per season and a leading
+   `League Name` column so multi-league seasons stay readable —
+   `SleeperDrafts_All_YYYY-MM-DD_HH-MM.xlsx`.
+
+Every completed pick is included: pick #, round, draft slot, drafter's
+username / team name, player, position, NFL team, keeper flag, and — for
+auction drafts — the actual dollar amount paid. Auction and non-auction
+formats emit different column sets so no column is ever meaningless.
+
+**Historical projections aren't preserved by Sleeper**, so this export
+records what players actually went for but not what they were projected for
+at the time. That "projected vs actual" analysis is a planned feature that
+will operate on live current-season drafts, where the projection is real.
 
 ## Permissions
 
-- `storage` — remembers the timestamp/count of your last export so the popup
-  can show it next time you open it.
-- `host_permissions` (Sleeper draft URLs only) — lets the content scripts run
-  on Sleeper draft pages and lets the popup read the active tab's URL to
-  detect whether you're on a draft page. No broad `<all_urls>` access.
+- `storage` — remembers your Sleeper username and the timestamp/count of
+  your last exports so the popup can show them next time.
+- `host_permissions` (Sleeper draft URLs + `api.sleeper.app`) — lets the
+  content scripts run on Sleeper draft pages, lets the popup read the active
+  tab's URL to detect whether you're on a draft page, and lets the past-drafts
+  export call Sleeper's public read-only API. No broad `<all_urls>` access.
 
-No `downloads` permission is requested — the CSV is downloaded via a plain
+No `downloads` permission is requested — CSVs are downloaded via a plain
 `<a download>` link, which needs no special permission.
 
 ## Project structure
@@ -61,19 +97,23 @@ No `downloads` permission is requested — the CSV is downloaded via a plain
 ```
 draftpilot/
   manifest.json
-  popup/            # toolbar popup UI
+  popup/                # toolbar popup UI
     popup.html
     popup.css
-    popup.js
-  content/          # injected into the Sleeper draft page
-    parser.js       # DOM -> normalized player objects
-    observer.js      # auto-scroll + row collection over the virtualized list
-    exporter.js       # normalized objects -> CSV -> download
-    ui.js            # message listener, orchestration, on-page status banner
-  utils/            # shared by popup and content scripts
-    csv.js          # RFC 4180 CSV encoding, not player-specific
-    storage.js      # chrome.storage.local wrapper
-    logger.js       # info/warn/error/debug, toggleable
+    popup.js            # orchestrates both current-draft and past-drafts flows
+    pastDrafts.js       # picks API -> normalized pick objects -> CSV -> download
+  content/              # injected into the Sleeper draft page
+    parser.js           # DOM -> normalized player objects
+    observer.js         # auto-scroll + row collection over the virtualized list
+    exporter.js         # normalized objects -> CSV -> download
+    ui.js               # message listener, orchestration, on-page status banner
+  utils/                # shared by popup and content scripts
+    csv.js              # RFC 4180 CSV encoding, not schema-specific
+    sleeperApi.js       # thin fetch wrapper around api.sleeper.app
+    storage.js          # chrome.storage.local wrapper
+    logger.js           # info/warn/error/debug, toggleable
+  vendor/
+    xlsx.full.min.js    # SheetJS CE, used by the popup's Export All flow
   icons/
 ```
 

@@ -8,11 +8,38 @@
 <body>
   <div class="popup">
     <h1>DraftPilot</h1>
-    <button id="export-btn" type="button">Export Draft Room</button>
-    <p id="status" class="status" role="status"></p>
+
+    <section class="section">
+      <h2>Your Sleeper Account</h2>
+      <label class="field-label" for="username-input">Username</label>
+      <input id="username-input" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. foxgarrett84" />
+      <button id="sync-btn" type="button">Sync League Data</button>
+      <p id="sync-status" class="status" role="status"></p>
+    </section>
+
+    <section class="section">
+      <h2>Current Draft Room</h2>
+      <button id="export-btn" type="button">Export Draft Room</button>
+      <p id="enrichment-status" class="status subtle"></p>
+      <p id="status" class="status" role="status"></p>
+    </section>
+
+    <section class="section" id="past-drafts-section" hidden>
+      <h2>Past Drafts</h2>
+      <button id="export-all-btn" type="button">Export All (Excel workbook with insights)</button>
+      <button id="export-all-csv-btn" type="button">Export All (single CSV, raw picks)</button>
+      <p id="past-status" class="status" role="status"></p>
+      <p class="field-label spacer">Individual drafts</p>
+      <ul id="draft-list" class="draft-list"></ul>
+    </section>
   </div>
+  <script src="../vendor/xlsx-js-style.bundle.js"></script>
   <script src="../utils/logger.js"></script>
   <script src="../utils/storage.js"></script>
+  <script src="../utils/csv.js"></script>
+  <script src="../utils/sleeperApi.js"></script>
+  <script src="../utils/analysis.js"></script>
+  <script src="pastDrafts.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

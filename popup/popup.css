@@ -4,7 +4,7 @@ body {
 }
 
 .popup {
-  width: 260px;
+  width: 320px;
   padding: 16px;
   background: #1a1a2e;
   color: #fff;
@@ -13,6 +13,26 @@ body {
 h1 {
   font-size: 16px;
   margin: 0 0 12px;
+}
+
+h2 {
+  font-size: 13px;
+  margin: 0 0 8px;
+  color: #a0a0b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.section {
+  margin-bottom: 18px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #2a2a44;
+}
+
+.section:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 0;
 }
 
 button {
@@ -35,8 +55,36 @@ button:disabled {
   cursor: not-allowed;
 }
 
+button + button {
+  margin-top: 6px;
+}
+
+.field-label {
+  display: block;
+  font-size: 11px;
+  color: #a0a0b8;
+  margin-bottom: 4px;
+}
+
+input[type="text"] {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  border: 1px solid #2a2a44;
+  border-radius: 6px;
+  background: #12122a;
+  color: #fff;
+  font-size: 13px;
+}
+
+input[type="text"]:focus {
+  outline: none;
+  border-color: #4f8cff;
+}
+
 .status {
-  margin-top: 10px;
+  margin: 10px 0 0;
   font-size: 12px;
   min-height: 16px;
   color: #c9c9d8;
@@ -48,4 +96,55 @@ button:disabled {
 
 .status.success {
   color: #6bffb0;
+}
+
+.status.subtle {
+  color: #8a8aa8;
+  font-size: 11px;
+}
+
+.field-label.spacer {
+  margin-top: 14px;
+}
+
+.draft-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.draft-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  margin-bottom: 6px;
+  background: #12122a;
+  border-radius: 6px;
+}
+
+.draft-list .draft-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.draft-list .draft-name {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.draft-list .draft-meta {
+  font-size: 11px;
+  color: #a0a0b8;
+}
+
+.draft-list button {
+  width: auto;
+  padding: 6px 10px;
+  font-size: 12px;
+  flex-shrink: 0;
 }
