@@ -114,6 +114,14 @@
    * doesn't know about breakouts, injuries, coaching changes. Users who
    * want that layer feed the exported CSV to an AI. */
   function enrichWithLeagueAdjusted(players, cachedAnalysis, options) {
+    // Remote kill switch. When playerValues is off, the CSV still
+    // exports raw Sleeper data untouched -- we just skip the
+    // league-adjusted column enrichment. downloadCSV already drops
+    // fully-null columns, so leagueAdjustedValue disappears cleanly.
+    const flags = (typeof window !== 'undefined' && window.DraftPilot && window.DraftPilot.featureFlags)
+      || (typeof self !== 'undefined' && self.DraftPilot && self.DraftPilot.featureFlags)
+      || null;
+    if (flags && !flags.isEnabled('playerValues')) return players;
     if (!cachedAnalysis || !cachedAnalysis.tierAggregates) return players;
     const tierAggregates = cachedAnalysis.tierAggregates;
     const rookieMults = cachedAnalysis.rookieMultipliers || {};

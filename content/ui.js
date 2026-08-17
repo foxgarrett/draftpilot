@@ -126,7 +126,14 @@
     if (banner) banner.remove();
   }
 
-  async function runExport(onCollected) {
+  /**
+   * Scroll the virtualized player list, collect every row, and merge in
+   * keeper/drafted context from the picks API. Returns the enriched
+   * player array + draft metadata. Shared by runExport (which then
+   * downloads a CSV) and capturePool (which persists to storage for
+   * Live Mode's nomination suggester).
+   */
+  async function collectPool(onCollected) {
     const grid = parser.findGrid();
     if (!grid) {
       throw observer.createError(
@@ -134,25 +141,17 @@
         'Draft room not detected. Open a Sleeper draft board and try again.'
       );
     }
-
-    showBanner('Draft Pilot: scanning draft board…');
-
     const draftType = parser.detectDraftType();
     const draftId = extractDraftId();
     logger.debug('Detected', { draftType, draftId });
 
-    // Kick off the picks-API fetch in parallel with the DOM scan so we
-    // don't add extra wall-clock time when there are keepers.
     const pickContextPromise = draftId
       ? fetchDraftedContext(draftId)
       : Promise.resolve({ pickMap: new Map(), teams: null, budget: null });
 
-    // Enable "Show Drafted" so keepers appear in the DOM with full stats,
-    // then restore whatever state the user had it in when we're done.
     const originalShowDrafted = parser.getShowDraftedState();
     if (originalShowDrafted === false) {
       parser.setShowDrafted(true);
-      // Give react-virtualized a beat to re-render before we start scanning.
       await new Promise((r) => setTimeout(r, 500));
     }
 
@@ -172,21 +171,14 @@
       if (originalShowDrafted === false) parser.setShowDrafted(false);
     }
 
-    // Merge in keeper/drafted context from the API before enrichment so
-    // the inflation math has status + keeperCost to work with.
     const { pickMap, teams, budget } = await pickContextPromise;
-    let keeperCount = 0;
     for (const player of players) {
       if (!player.isDrafted) continue;
       const ctx = pickMap.get(pickKey(player.playerName, player.position));
       if (ctx) {
         player.keeperCost = ctx.keeperCost;
         player.keptBy = ctx.keptBy;
-        // Live draft picks (with a valid picked_by/roster_id) get "Drafted";
-        // pre-draft/mock keepers get "Keeper" so a user can distinguish
-        // "already locked in" from "just happened in the live draft".
         player.status = ctx.isKeeperFlag ? 'Keeper' : 'Drafted';
-        keeperCount++;
       } else {
         player.status = 'Kept (unresolved)';
       }
@@ -195,13 +187,52 @@
       if (!player.status) player.status = 'Available';
     }
 
+    return { players, draftType, draftId, teams, budget };
+  }
+
+  /**
+   * Persist a compact pool snapshot for Live Mode's nomination
+   * suggester. Only the fields the suggester needs are kept -- projected
+   * value, position, team, rookie flag, drafted flag -- so the storage
+   * write stays small and cheap to parse on the popup side.
+   */
+  async function savePool({ draftId, players }) {
+    // `points` is the quality signal used by the tier engine (Sleeper's
+    // projected fantasy points). It's smoother than auction $, which
+    // conflates market pricing with player quality and produces
+    // pathological tier fragmentation on heavy-tailed pools. `projection`
+    // (auction $) stays for pricing, inflation, and bid recommendations.
+    const compact = players.map((p) => ({
+      name: p.playerName,
+      position: p.position,
+      team: p.team,
+      projection: p.projectedAuctionValue,
+      points: p.projectedFantasyPoints,
+      yearsExp: p.yearsExp,
+      isDrafted: !!p.isDrafted,
+    }));
+    await storage.set('playerPool', {
+      draftId,
+      capturedAt: Date.now(),
+      players: compact,
+    });
+  }
+
+  async function runExport(onCollected) {
+    showBanner('Draft Pilot: scanning draft board…');
+    const { players, draftType, draftId, teams, budget } = await collectPool(onCollected);
+    let keeperCount = players.filter((p) => p.status === 'Keeper' || p.status === 'Drafted').length;
+
+    // Opportunistic reuse: caching the pool here means a user who
+    // exports first, then goes to Live Mode, gets the nomination
+    // suggester without a separate load step.
+    await savePool({ draftId, players }).catch(() => {});
+
     // Auction drafts optionally get a League-Adjusted Value column, powered
     // by cached past-drafts analysis. Silent no-op if the cache is empty.
     if (draftType === 'auction') {
       const cached = await storage.get('leagueTierAggregates').catch(() => null);
       if (cached) {
-        // First pass -- assign base league-adjusted values to everyone
-        // (no inflation) so we can compare keeper costs to expected value.
         exporter.enrichWithLeagueAdjusted(players, cached);
         const inflationFactor = computeInflationFactor(players, teams, budget);
         if (Math.abs(inflationFactor - 1) > 0.001) {
@@ -216,30 +247,57 @@
 
     showBanner(`Draft Pilot: exported ${players.length} players ✓`);
     setTimeout(hideBanner, 3000);
+    return players.length;
+  }
 
+  /**
+   * Same scroll+collect as runExport, but no CSV download -- just
+   * persists the snapshot for Live Mode. Called from the side panel
+   * via DRAFTPILOT_CAPTURE_POOL message.
+   */
+  async function capturePool() {
+    showBanner('Draft Pilot: capturing player pool…');
+    const { players, draftId } = await collectPool();
+    await savePool({ draftId, players });
+    showBanner(`Draft Pilot: captured ${players.length} players ✓`);
+    setTimeout(hideBanner, 2000);
     return players.length;
   }
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (!message || message.type !== 'DRAFTPILOT_EXPORT') return undefined;
+    if (!message) return undefined;
 
-    runExport((collected) => {
-      chrome.runtime.sendMessage({ type: 'DRAFTPILOT_PROGRESS', collected }).catch(() => {});
-    })
-      .then((count) => sendResponse({ success: true, count }))
-      .catch((err) => {
-        logger.error('Export failed', err);
-        // Prefer the plain-English message sleeperApi attaches; fall back
-        // to the raw error message for anything thrown by our own code.
-        const message = err.userMessage || err.message || 'Export failed.';
-        showBanner(`Draft Pilot: ${message}`);
-        setTimeout(hideBanner, 4000);
-        sendResponse({ success: false, error: message, code: err.code });
-      });
+    if (message.type === 'DRAFTPILOT_EXPORT') {
+      runExport((collected) => {
+        chrome.runtime.sendMessage({ type: 'DRAFTPILOT_PROGRESS', collected }).catch(() => {});
+      })
+        .then((count) => sendResponse({ success: true, count }))
+        .catch((err) => {
+          logger.error('Export failed', err);
+          const msg = err.userMessage || err.message || 'Export failed.';
+          showBanner(`Draft Pilot: ${msg}`);
+          setTimeout(hideBanner, 4000);
+          sendResponse({ success: false, error: msg, code: err.code });
+        });
+      return true;
+    }
 
-    return true; // keep the message channel open for the async sendResponse above
+    if (message.type === 'DRAFTPILOT_CAPTURE_POOL') {
+      capturePool()
+        .then((count) => sendResponse({ success: true, count }))
+        .catch((err) => {
+          logger.error('Pool capture failed', err);
+          const msg = err.userMessage || err.message || 'Pool capture failed.';
+          showBanner(`Draft Pilot: ${msg}`);
+          setTimeout(hideBanner, 4000);
+          sendResponse({ success: false, error: msg, code: err.code });
+        });
+      return true;
+    }
+
+    return undefined;
   });
 
   global.DraftPilot = global.DraftPilot || {};
-  global.DraftPilot.ui = { runExport, showBanner, hideBanner };
+  global.DraftPilot.ui = { runExport, capturePool, showBanner, hideBanner };
 })(typeof window !== 'undefined' ? window : globalThis);

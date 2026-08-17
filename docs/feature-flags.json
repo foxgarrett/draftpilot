@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "updatedAt": "2026-08-12T00:00:00Z",
+  "emergencyDisabled": false,
+  "features": {
+    "auctionInsights": true,
+    "playerValues": true,
+    "bidRecommendations": true,
+    "liveBidAnalysis": true
+  }
+}

@@ -4,7 +4,42 @@
   "version": "0.1.0",
   "description": "Export your Sleeper Fantasy Football draft room to CSV.",
   "action": {
-    "default_popup": "popup/popup.html"
+    "default_title": "Draft Pilot",
+    "default_icon": {
+      "16": "icons/logo-light-16.png",
+      "32": "icons/logo-light-32.png",
+      "48": "icons/logo-light-48.png",
+      "128": "icons/logo-light-128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/logo-light-16.png",
+    "32": "icons/logo-light-32.png",
+    "48": "icons/logo-light-48.png",
+    "128": "icons/logo-light-128.png"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "scripts": [
+      "utils/logger.js",
+      "utils/storage.js",
+      "utils/featureFlags.js",
+      "background.js"
+    ]
+  },
+  "side_panel": {
+    "default_path": "popup/popup.html"
+  },
+  "sidebar_action": {
+    "default_title": "Draft Pilot",
+    "default_panel": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/logo-light-16.png",
+      "32": "icons/logo-light-32.png",
+      "48": "icons/logo-light-48.png",
+      "96": "icons/logo-light-96.png",
+      "128": "icons/logo-light-128.png"
+    }
   },
   "browser_specific_settings": {
     "gecko": {
@@ -12,13 +47,14 @@
       "strict_min_version": "109.0"
     }
   },
-  "permissions": ["storage"],
+  "permissions": ["storage", "sidePanel", "alarms"],
   "host_permissions": [
     "https://sleeper.com/draft/*",
     "https://*.sleeper.com/draft/*",
     "https://sleeper.app/draft/*",
     "https://*.sleeper.app/draft/*",
-    "https://api.sleeper.app/*"
+    "https://api.sleeper.app/*",
+    "https://foxgarrett.github.io/*"
   ],
   "content_scripts": [
     {
@@ -31,12 +67,14 @@
       "js": [
         "utils/logger.js",
         "utils/storage.js",
+        "utils/featureFlags.js",
         "utils/csv.js",
         "utils/sleeperApi.js",
         "content/parser.js",
         "content/observer.js",
         "content/exporter.js",
-        "content/ui.js"
+        "content/ui.js",
+        "content/liveObserver.js"
       ],
       "run_at": "document_idle"
     }

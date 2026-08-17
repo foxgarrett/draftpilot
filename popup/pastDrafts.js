@@ -363,6 +363,14 @@
    * timing, budget plan, positional tiers, keepers, plus a leading
    * "Insights (README)" sheet explaining what each analytic tab means. */
   function appendInsightSheets(workbook, drafts, formatState) {
+    // Remote kill switch. When auctionInsights is off (e.g. data
+    // provider issue) we still emit the workbook with the raw picks
+    // tab intact -- callers just get no analytics tabs. The popup's
+    // XLSX button is also disabled when this flag is off so users
+    // aren't surprised by the emptier file.
+    const flags = window.DraftPilot && window.DraftPilot.featureFlags;
+    if (flags && !flags.isEnabled('auctionInsights')) return;
+
     const managers = analysis.perManagerSpending(drafts);
     const trends = analysis.leaguePositionalTrends(drafts);
     const mostRecentAuction = drafts
@@ -708,7 +716,47 @@
    * current-draft-room exporter (which uses them to compute a
    * league-adjusted-value column). Doesn't download anything -- purely a
    * background analysis pass. */
-  async function cacheLeagueAnalysis(leagues, { onProgress } = {}) {
+  /** Fetches current-year league drafts (metadata only) and returns any
+   * whose scheduled start_time is still in the future. Used to power the
+   * "It's Draft Day!" prompt when today matches a scheduled draft. */
+  async function collectUpcomingDrafts(userId) {
+    if (!userId) return [];
+    const currentYear = String(new Date().getFullYear());
+    const currentYearLeagues = await sleeperApi
+      .getUserLeagues(userId, currentYear)
+      .catch(() => []);
+    const upcoming = [];
+    for (const league of currentYearLeagues || []) {
+      if (!league.draft_id) continue;
+      // Completed leagues in the current year would have finished drafts
+      // already; skip them so we don't nag the user about a done draft.
+      if (league.status === 'complete') continue;
+      try {
+        const draft = await sleeperApi.getDraft(league.draft_id);
+        if (!draft) continue;
+        // start_time is Sleeper's scheduled UTC-ms timestamp for the
+        // draft. It's populated once the commish schedules the draft;
+        // pre-scheduled drafts (no time set) get skipped here.
+        if (!draft.start_time || typeof draft.start_time !== 'number') continue;
+        // A completed draft's status is 'complete'; we only care about
+        // upcoming ones ('pre_draft', 'paused', 'drafting').
+        if (draft.status === 'complete') continue;
+        upcoming.push({
+          leagueName: league.name,
+          leagueId: league.league_id,
+          draftId: league.draft_id,
+          startTime: draft.start_time,
+          status: draft.status,
+        });
+      } catch (err) {
+        // Skip any individual draft-fetch failure; upcoming-drafts info
+        // is best-effort and doesn't block the sync.
+      }
+    }
+    return upcoming;
+  }
+
+  async function cacheLeagueAnalysis(leagues, { onProgress, userId } = {}) {
     const draftSummaries = [];
     const failures = [];
     for (let i = 0; i < leagues.length; i++) {
@@ -742,6 +790,10 @@
     const trends = analysis.leaguePositionalTrends(effectiveDrafts);
     const rookieMults = analysis.rookieMultipliers(effectiveDrafts);
 
+    // Best-effort: current-year draft schedule for the "It's Draft Day!"
+    // prompt. Failures don't block the main sync.
+    const upcomingDrafts = await collectUpcomingDrafts(userId).catch(() => []);
+
     const payload = {
       cachedAt: Date.now(),
       formatLabel: formatState.latestFormat,
@@ -750,6 +802,7 @@
       seasonsAnalyzed: effectiveDrafts.length,
       hasFormatChanges: formatState.hasChanges,
       totalDraftsFound: draftSummaries.length,
+      upcomingDrafts,
       failures,
       // The list the popup renders in "Individual drafts" -- cached so the
       // popup can restore this section without re-hitting the API on open.

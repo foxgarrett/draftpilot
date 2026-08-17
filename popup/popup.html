@@ -6,39 +6,528 @@
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
-  <div class="popup">
-    <h1>Draft Pilot</h1>
+  <div id="user-bar" class="user-bar" hidden>
+    <div class="user-bar-left">
+      <span id="username-display" class="username-display"></span>
+      <button id="change-user-btn" class="link-btn" type="button">Change</button>
+    </div>
+    <div class="settings-wrap">
+      <button id="settings-btn" class="settings-btn" type="button" aria-haspopup="true" aria-expanded="false">
+        Settings
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
+      <div id="settings-menu" class="settings-menu" role="menu" hidden>
+        <div class="settings-menu-label">Theme</div>
+        <button class="settings-menu-item" role="menuitemradio" data-theme-value="system" type="button">
+          <span class="menu-check" aria-hidden="true">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </span>
+          Match browser
+        </button>
+        <button class="settings-menu-item" role="menuitemradio" data-theme-value="light" type="button">
+          <span class="menu-check" aria-hidden="true">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </span>
+          Light
+        </button>
+        <button class="settings-menu-item" role="menuitemradio" data-theme-value="dark" type="button">
+          <span class="menu-check" aria-hidden="true">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </span>
+          Dark
+        </button>
+        <div class="settings-menu-divider" role="separator"></div>
+        <button class="settings-menu-item settings-menu-link" role="menuitem" id="enter-live-mode-btn" type="button">
+          Live Draft Mode
+          <span class="beta-badge">beta</span>
+        </button>
+        <div class="settings-menu-divider" role="separator"></div>
+        <a class="settings-menu-item settings-menu-link" role="menuitem" href="https://github.com/foxgarrett/draftpilot/issues/new" target="_blank" rel="noopener noreferrer">
+          Send feedback
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+            <polyline points="15 3 21 3 21 9"/>
+            <line x1="10" y1="14" x2="21" y2="3"/>
+          </svg>
+        </a>
+        <a class="settings-menu-item settings-menu-link" role="menuitem" href="https://foxgarrett.github.io/draftpilot/privacy.html" target="_blank" rel="noopener noreferrer">
+          Privacy policy
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+            <polyline points="15 3 21 3 21 9"/>
+            <line x1="10" y1="14" x2="21" y2="3"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+  </div>
 
-    <section class="section">
-      <h2>Your Sleeper Account</h2>
-      <label class="field-label" for="username-input">Username</label>
-      <input id="username-input" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. foxgarrett84" />
-      <button id="sync-btn" type="button">Sync League Data</button>
+  <main class="app-content">
+    <!-- Welcome / onboarding state -->
+    <section id="welcome-view" class="welcome-view">
+      <div class="hero-avatar" role="img" aria-label="Draft Pilot"></div>
+      <h1 class="hero-title">Welcome to Draft Pilot</h1>
+      <p class="hero-subtitle">Provide your Sleeper username so we can sync your league data.</p>
+      <div class="field">
+        <label for="username-input" class="field-label">Sleeper Username</label>
+        <input id="username-input" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. LeagueWinner" />
+      </div>
+      <button id="sync-btn" class="btn btn-primary" type="button">Sync League Data</button>
       <p id="sync-status" class="status" role="status"></p>
     </section>
 
-    <section class="section">
-      <h2>Current Draft Room</h2>
-      <button id="export-btn" type="button">Export Draft Room</button>
-      <p id="enrichment-status" class="status subtle"></p>
-      <p id="status" class="status" role="status"></p>
+    <!-- Synced / main state -->
+    <section id="synced-view" hidden>
+      <!-- Draft Day card: shown only on the day one of the user's leagues has a scheduled draft. -->
+      <aside id="draft-day-card" class="card card-draft-day" hidden>
+        <h3 class="card-draft-day-title" id="draft-day-title">It's Draft Day!</h3>
+        <p class="card-draft-day-body" id="draft-day-body">Time to draft a league winner. Let's guide you to a championship.</p>
+        <button id="draft-day-btn" class="btn btn-inverse" type="button">Switch to Live Draft Mode</button>
+      </aside>
+
+      <!-- Post-sync celebration: full heading + summary bullets. Shown
+           only immediately after a successful sync in the current session.
+           Reopening the panel drops back to the condensed status bar. -->
+      <div id="sync-celebration" hidden>
+        <h2 class="synced-heading">We're synced.</h2>
+        <p class="synced-subtitle">Here's what we gathered for your pre-draft analysis.</p>
+        <ul id="synced-summary" class="summary-list"></ul>
+      </div>
+
+      <!-- Condensed status row: shown on subsequent opens once the user
+           has already seen the celebration. Refresh icon triggers a
+           silent re-sync in place. -->
+      <div id="sync-status-bar" class="sync-status-bar" hidden>
+        <span class="sync-status-label">Status</span>
+        <span id="sync-status-value" class="sync-status-value"></span>
+        <button id="resync-btn" class="icon-btn resync-btn" type="button" aria-label="Sync again">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="23 4 23 10 17 10"/>
+            <polyline points="1 20 1 14 7 14"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>
+        </button>
+      </div>
+
+      <section class="card">
+        <h3 class="card-title" id="draft-values-title">2026 Draft Values</h3>
+        <p class="card-body">Enter this year's draft room and click Export to receive both Sleeper values and values adjusted to your league.</p>
+        <button id="export-current-btn" class="btn btn-primary" type="button">Export 2026 Values</button>
+        <p id="export-status" class="status" role="status"></p>
+      </section>
+
+      <section class="card">
+        <h3 class="card-title">Insights and Past Drafts</h3>
+        <p class="card-body">Learn how your league-mates pick. See where they overspend. See where you can take advantage.</p>
+        <p class="card-note"><em>League-specific insights are only available in the .xlsx export.</em></p>
+        <button id="export-all-xlsx-btn" class="btn btn-primary" type="button">Export with insights (.xlsx)</button>
+        <button id="export-all-csv-btn" class="btn btn-secondary" type="button">Export raw data (.csv)</button>
+        <p id="past-status" class="status" role="status"></p>
+      </section>
+
+      <section class="section">
+        <h3 class="section-heading">Individual drafts</h3>
+        <ul id="draft-list" class="draft-list"></ul>
+      </section>
     </section>
 
-    <section class="section" id="past-drafts-section" hidden>
-      <h2>Past Drafts</h2>
-      <button id="export-all-btn" type="button">Export All (Excel workbook with insights)</button>
-      <button id="export-all-csv-btn" type="button">Export All (single CSV, raw picks)</button>
-      <p id="past-status" class="status" role="status"></p>
-      <p class="field-label spacer">Individual drafts</p>
-      <ul id="draft-list" class="draft-list"></ul>
+    <!-- Live Draft Mode. Reached from the Draft Day card CTA or the
+         Settings > Live Draft Mode entry. Sibling of the synced view;
+         only one is visible at a time. Internal sections below are
+         mutually exclusive states of the same session lifecycle. -->
+    <section id="live-draft-view" hidden>
+      <div class="mode-crumb">
+        <button id="back-to-analysis-btn" class="link-btn" type="button">← Back to pre-draft analysis</button>
+        <span class="beta-badge beta-badge-lg">beta</span>
+      </div>
+
+      <h2 class="live-draft-heading">Live Draft Mode</h2>
+
+      <!-- No draft detected in the active tab AND user needs to pick one. -->
+      <section id="live-no-draft" class="card" hidden>
+        <h3 class="card-title">No draft detected</h3>
+        <p class="card-body" id="live-no-draft-body">
+          Open a Sleeper draft room in another tab, then reopen this side panel.
+        </p>
+        <ul id="live-draft-picker" class="draft-list"></ul>
+      </section>
+
+      <!-- Bootstrap-in-progress. -->
+      <section id="live-connecting" class="card" hidden>
+        <p class="card-body">Connecting to draft…</p>
+      </section>
+
+      <!-- Bootstrap failed. -->
+      <section id="live-error" class="card card-error" hidden>
+        <h3 class="card-title">Couldn't load draft</h3>
+        <p id="live-error-msg" class="card-body"></p>
+        <button id="live-retry-btn" class="btn btn-secondary" type="button">Retry</button>
+      </section>
+
+      <!-- Active session. Auction shows the live pick log; snake shows a
+           "coming in Phase 2" notice above the header info. -->
+      <section id="live-active" hidden>
+        <!-- First-run tip: shows once when Live Mode is opened without
+             a loaded player pool. Storage-flagged so a dismissed tip
+             stays dismissed across sessions. Auto-hidden as soon as a
+             pool loads. -->
+        <div id="live-first-run-tip" class="live-first-run-tip" hidden>
+          <div class="live-first-run-tip-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </div>
+          <div class="live-first-run-tip-body">
+            <strong>Load your player pool for accurate tiers.</strong>
+            Tap "Load full player pool" in the Suggested nominations card below. This snapshots your league's current-year projections so Draft Pilot can rank each nomination against real positional depth.
+          </div>
+          <button id="live-first-run-tip-dismiss" class="live-first-run-tip-dismiss" type="button" aria-label="Dismiss tip">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="live-header">
+          <div class="live-header-info">
+            <div class="live-league-name" id="live-league-name"></div>
+            <div class="live-format-line" id="live-format-line"></div>
+          </div>
+          <div class="live-status-badge" id="live-status-badge"></div>
+        </div>
+
+        <section id="live-snake-notice" class="card card-placeholder" hidden>
+          <h3 class="card-title">Snake drafts coming in Phase 2</h3>
+          <p class="card-body">Best-available lists, tier-break alerts, and positional runs are on the roadmap. For now, only auction drafts get live assistance.</p>
+        </section>
+
+        <!-- Current nomination. Populated by the content-script scraper
+             (content/liveObserver.js) via runtime.sendMessage; empty
+             until the user is on the draft tab with the auction panel
+             expanded. -->
+        <!-- On-the-Block card. The primary decision surface in Live
+             Mode. Three-level hierarchy:
+               Level 1  — the recommendation (BID TO $X / PASS / …)
+               Level 2  — league value + fit + reasons
+               Level 3  — likely competition + expandable breakdown
+             Everything shown is answering: "This player is available
+             right now. What should I do?" -->
+        <!-- On-the-Block card. Simplified to three primary tiers:
+               Tier 1 — Decision (BID TO $X / PASS / BID IF ≤ $X)
+               Tier 2 — One composed context sentence (Insight Priority)
+               Tier 3 — One composed competition sentence
+             Plus a compact top-2 Alternatives block and a single
+             progressive-disclosure Details panel. All deeper analysis
+             (fit, cliff, pass consequence, scarcity math, alt scores,
+             methodology) lives inside the Details panel — never in
+             the default view. -->
+        <section id="live-nomination-card" class="card live-nomination-card" hidden>
+          <div class="live-nomination-status-row">
+            <span id="live-nomination-status" class="live-nomination-status"></span>
+          </div>
+          <div class="live-nomination-player">
+            <div class="live-nomination-name" id="live-nomination-name"></div>
+            <div class="live-nomination-meta">
+              <span id="live-nomination-meta"></span>
+              <span id="live-nomination-tier" class="live-nomination-tier" hidden></span>
+            </div>
+            <div id="live-nomination-nominator" class="live-nomination-nominator" hidden></div>
+          </div>
+
+          <!-- Tier 1 — Decision. -->
+          <div id="live-nomination-rec" class="live-nomination-rec" hidden>
+            <div class="live-nomination-rec-headline" id="live-nomination-rec-headline">—</div>
+            <div class="live-nomination-rec-range" id="live-nomination-rec-range" hidden></div>
+          </div>
+
+          <!-- Tier 2 — Primary context. One composed sentence chosen
+               by the Insight Priority engine. Replaces the previous
+               fit chip / why line / scarcity alert / cliff / pass
+               consequence / scarcity row — all overlapping views of
+               the same underlying signals. -->
+          <div id="live-context" class="live-context" hidden>
+            <span id="live-context-text" class="live-context-text"></span>
+          </div>
+
+          <!-- Tier 3 — Competition. One composed sentence combining
+               the summary and biggest-threat callout. -->
+          <div id="live-competition" class="live-competition" hidden>
+            <span id="live-competition-text" class="live-competition-text"></span>
+          </div>
+
+          <!-- Alternatives — top 2 shown by default. Full list is
+               revealed inside the Details panel below. -->
+          <div id="live-nomination-alternatives" class="live-alternatives" hidden>
+            <div class="live-alternatives-header">
+              <span class="live-alternatives-label">Alternatives</span>
+            </div>
+            <ul id="live-alternatives-list" class="live-alternatives-list"></ul>
+            <div id="live-alternatives-empty" class="live-alternatives-empty" hidden>
+              No strong alternatives remaining.
+            </div>
+          </div>
+
+          <!-- Progressive disclosure — the ONE place to see the full
+               reasoning: fit, scarcity, cliff, pass consequence,
+               remaining alternatives, competitor breakdown, per-lift
+               dollar contributions, and methodology. -->
+          <details id="live-nomination-details" class="live-nomination-details" hidden>
+            <summary id="live-nomination-details-summary">Details</summary>
+            <div id="live-details-body" class="live-details-body"></div>
+            <p class="live-nomination-details-caveat">
+              This is a recommendation, not a guaranteed clearing price. Trust the room and your feel for the auction.
+            </p>
+          </details>
+
+          <!-- Retained hidden nodes so legacy render paths (feature
+               flags off, fallback branches) don't null-deref. Not
+               shown in the default hierarchy. -->
+          <div id="live-nomination-fit" hidden>
+            <span id="live-nomination-fit-icon"></span>
+            <span id="live-nomination-fit-text"></span>
+          </div>
+          <div id="live-nomination-why" hidden>
+            <span id="live-nomination-why-text"></span>
+          </div>
+          <div id="live-nomination-scarcity" hidden></div>
+          <div id="live-primary-insight" hidden>
+            <span id="live-primary-insight-headline"></span>
+            <span id="live-primary-insight-explanation"></span>
+          </div>
+          <div id="live-value-cliff" hidden>
+            <span id="live-value-cliff-text"></span>
+          </div>
+          <div id="live-pass-consequence" hidden>
+            <span id="live-pass-consequence-headline"></span>
+            <span id="live-pass-consequence-blurb"></span>
+          </div>
+          <div id="live-nomination-scarcity-row" hidden>
+            <span id="live-scarcity-level"></span>
+            <span id="live-scarcity-reason"></span>
+          </div>
+          <div id="live-nomination-comp" hidden>
+            <div id="live-nomination-comp-summary"></div>
+            <div id="live-nomination-comp-list"></div>
+            <div id="live-nomination-threat" hidden>
+              <span id="live-nomination-threat-text"></span>
+            </div>
+          </div>
+          <div id="live-nomination-value-block" hidden>
+            <span id="live-nomination-value-source"></span>
+            <span id="live-nomination-league-val"></span>
+            <span id="live-nomination-verdict"></span>
+          </div>
+          <div id="live-nomination-you" hidden>
+            <span id="live-nom-you-need"></span>
+          </div>
+          <p id="live-nomination-stale" class="live-nomination-stale" hidden>
+            No update from the draft tab in a while. Make sure the Sleeper draft is open in another tab.
+          </p>
+        </section>
+
+<!-- Auction inflation panel. Surfaces the live inflation factor
+             (already computed for the nomination card) as a first-class
+             signal — factor, trend, sparkline, and the $-remaining vs
+             $-expected breakdown that drives the number. Auction-only. -->
+        <!-- Auction inflation — compact ambient chip. The chip itself
+             is the toggle; expanded body reveals interpretation, advice,
+             and supporting math. Collapsed by default so it stays
+             ambient during a live nomination. -->
+        <section id="live-inflation-card" class="card card-compact" hidden>
+          <button
+            class="live-infl-chip card-title-toggle"
+            id="live-inflation-toggle"
+            type="button"
+            aria-expanded="false"
+            aria-controls="live-inflation-body"
+          >
+            <span class="live-infl-chip-label">Inflation</span>
+            <span class="live-infl-factor" id="live-infl-factor">—</span>
+            <span class="live-infl-word" id="live-infl-word"></span>
+            <span class="live-infl-arrow" id="live-infl-arrow" hidden></span>
+            <svg class="card-toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
+          <div id="live-inflation-body" class="card-collapsible-body" hidden>
+            <p class="live-infl-interp" id="live-infl-interp">—</p>
+            <p class="live-infl-advice" id="live-infl-advice"></p>
+            <p class="live-infl-support" id="live-infl-support"></p>
+          </div>
+        </section>
+
+        <!-- Positional Market Snapshot. One row per position summarizing
+             league-wide market pressure. Sorted by pressure desc so the
+             hottest positions surface first. Reads the same scarcity
+             engine as the On-the-Block card; numbers always agree. -->
+        <!-- Positional Market. During an active nomination only the
+             nominated position's row is shown by default; the full
+             board is revealed via "See positional market". -->
+        <section id="live-market-snapshot-card" class="card card-compact" hidden>
+          <div id="live-market-snapshot-body" class="live-market-snapshot-body"></div>
+          <button
+            id="live-market-snapshot-toggle"
+            class="link-btn live-market-snapshot-toggle"
+            type="button"
+            hidden
+          >See positional market</button>
+        </section>
+
+        <!-- Draft performance scorecard. Aggregates the user's own picks
+             into a value + composition summary. Hidden until a pool is
+             loaded (verdicts require projections) and until the user
+             has drafted at least one player. -->
+        <section id="live-your-team-card" class="card" hidden>
+          <button
+            class="card-title card-title-toggle"
+            id="live-your-team-toggle"
+            type="button"
+            aria-expanded="true"
+            aria-controls="live-your-team-body"
+          >
+            <span>Your draft performance</span>
+            <svg class="card-toggle-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
+          <div id="live-your-team-body" class="card-collapsible-body">
+            <div class="live-yt-insight" id="live-yt-insight">—</div>
+            <div class="live-yt-stat-grid">
+              <div class="live-yt-stat">
+                <div class="live-yt-stat-label">Value net</div>
+                <div class="live-yt-stat-value" id="live-yt-net">—</div>
+                <div class="live-yt-stat-detail" id="live-yt-net-detail"></div>
+              </div>
+              <div class="live-yt-stat">
+                <div class="live-yt-stat-label">Verdicts</div>
+                <div class="live-yt-stat-value" id="live-yt-verdicts">—</div>
+                <div class="live-yt-stat-detail" id="live-yt-verdicts-detail"></div>
+              </div>
+              <div class="live-yt-stat">
+                <div class="live-yt-stat-label">Elite starters</div>
+                <div class="live-yt-stat-value" id="live-yt-elite">—</div>
+                <div class="live-yt-stat-detail" id="live-yt-elite-detail"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Nomination suggester. Requires a full player-pool snapshot
+             captured by the content script (via scroll + collect on
+             the Sleeper draft board). The snapshot is opportunistically
+             cached by "Export My Draft Room" so an early exporter gets
+             the suggester "for free"; otherwise a load button here
+             triggers the capture. -->
+        <section id="live-suggester-card" class="card" hidden>
+          <button
+            class="card-title card-title-toggle"
+            id="live-suggester-toggle"
+            type="button"
+            aria-expanded="true"
+            aria-controls="live-suggester-body"
+          >
+            <span>Suggested nominations</span>
+            <svg class="card-toggle-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
+          <div id="live-suggester-body" class="card-collapsible-body">
+            <p id="live-suggester-hint" class="card-body">
+              Nominate players your opponents need — force them to burn cap before you take a run at your targets.
+            </p>
+            <button id="live-suggester-load-btn" class="btn btn-secondary btn-tiny" type="button">
+              Load full player pool
+            </button>
+            <p id="live-suggester-status" class="status" role="status"></p>
+            <ul id="live-suggester-list" class="live-suggester-list"></ul>
+            <p id="live-suggester-footnote" class="live-suggester-footnote" hidden></p>
+          </div>
+        </section>
+
+        <!-- Per-team budgets (auction only). Populated from the same
+             message stream as the nomination card. -->
+        <section id="live-budgets-card" class="card" hidden>
+          <button
+            class="card-title card-title-toggle"
+            id="live-budgets-toggle"
+            type="button"
+            aria-expanded="true"
+            aria-controls="live-budgets-body"
+          >
+            <span>Team roster needs</span>
+            <svg class="card-toggle-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
+          <div id="live-budgets-body" class="card-collapsible-body">
+            <div class="live-budgets-scroll">
+              <table class="live-budgets-table">
+                <thead>
+                  <tr>
+                    <th class="live-budgets-mgr">Manager</th>
+                    <th class="live-budgets-needs">Starter needs</th>
+                    <th class="live-budgets-bench">Open bench slots</th>
+                  </tr>
+                </thead>
+                <tbody id="live-budgets-tbody"></tbody>
+              </table>
+              <p class="live-budgets-hint" id="live-budgets-hint" hidden>
+                Rows highlighted green have a slot for the nominated position and enough budget to compete.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Recent activity — collapsed by default. Post-hoc log,
+             not a decision surface; keep it available but out of the
+             way while the manager is deciding on a nomination. -->
+        <section id="live-pick-log-card" class="card" hidden>
+          <button
+            class="card-title card-title-toggle"
+            id="live-picks-toggle"
+            type="button"
+            aria-expanded="false"
+            aria-controls="live-picks-body"
+          >
+            <span>Recent activity</span>
+            <svg class="card-toggle-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
+          <div id="live-picks-body" class="card-collapsible-body" hidden>
+            <p id="live-pick-empty" class="card-body">No picks completed yet.</p>
+            <ul id="live-pick-log" class="live-pick-log"></ul>
+            <p id="live-last-updated" class="live-last-updated"></p>
+          </div>
+        </section>
+      </section>
+
+      <!-- Escape-hatch export. Demoted from a primary-styled card to
+           a compact footer link so it never competes visually with the
+           in-draft decision surfaces. Still always available. -->
+      <div class="live-export-footer">
+        <button id="live-export-btn" class="link-btn" type="button">Export current draft room to CSV</button>
+        <p id="live-export-status" class="status status-inline" role="status"></p>
+      </div>
     </section>
-  </div>
+  </main>
+
   <script src="../vendor/xlsx-js-style.bundle.js"></script>
   <script src="../utils/logger.js"></script>
   <script src="../utils/storage.js"></script>
+  <script src="../utils/featureFlags.js"></script>
   <script src="../utils/csv.js"></script>
   <script src="../utils/sleeperApi.js"></script>
   <script src="../utils/analysis.js"></script>
+  <script src="../utils/rosterOptimizer.js"></script>
+  <script src="../utils/sleeperSlotAdapter.js"></script>
+  <script src="../utils/bidEngine.js"></script>
+  <script src="../utils/liveDraft.js"></script>
   <script src="pastDrafts.js"></script>
   <script src="popup.js"></script>
 </body>

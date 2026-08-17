@@ -1,150 +1,2141 @@
+/* ------------------------------------------------------------------
+   Theme system
+   ------------------------------------------------------------------
+   Default set matches system dark mode via prefers-color-scheme.
+   Two explicit overrides (`data-theme="light"` and `data-theme="dark"`)
+   let the settings menu win over the OS preference when the user
+   opts in.
+   ------------------------------------------------------------------ */
+
+:root {
+  color-scheme: light dark;
+
+  --bg: #f1f5f9;
+  --card-bg: #ffffff;
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --text-heading: #0f172a;
+  --border: #e2e8f0;
+  --divider: rgba(15, 23, 42, 0.08);
+
+  --primary-bg: #0f172a;
+  --primary-text: #ffffff;
+  --primary-hover: #1e293b;
+
+  --secondary-border: #06b6d4;
+  --secondary-text: #06b6d4;
+  --secondary-hover-bg: rgba(6, 182, 212, 0.08);
+
+  --success: #059669;
+  --link: #0284c7;
+  --danger: #dc2626;
+  --hero-avatar: #0f172a;
+
+  --draftday-bg: #0f172a;
+  --draftday-title: #ffffff;
+  --draftday-body: #cbd5e1;
+  --draftday-btn-bg: #22d3ee;
+  --draftday-btn-text: #0f172a;
+
+  --input-bg: #ffffff;
+  --input-border: #cbd5e1;
+  --input-focus: #06b6d4;
+
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-menu: 0 8px 24px rgba(15, 23, 42, 0.16);
+
+  --brand-logo: url("../icons/logo-light-128.png");
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1524;
+    --card-bg: #131c31;
+    --text: #f1f5f9;
+    --text-muted: #94a3b8;
+    --text-heading: #ffffff;
+    --border: #1f2a44;
+    --divider: rgba(255, 255, 255, 0.08);
+
+    --primary-bg: #22d3ee;
+    --primary-text: #0f172a;
+    --primary-hover: #67e8f9;
+
+    --secondary-border: #22d3ee;
+    --secondary-text: #22d3ee;
+    --secondary-hover-bg: rgba(34, 211, 238, 0.1);
+
+    --success: #34d399;
+    --link: #22d3ee;
+    --danger: #f87171;
+    --hero-avatar: #f1f5f9;
+
+    --draftday-bg: #22d3ee;
+    --draftday-title: #0f172a;
+    --draftday-body: #0f172a;
+    --draftday-btn-bg: #0f172a;
+    --draftday-btn-text: #ffffff;
+
+    --input-bg: #1a2338;
+    --input-border: #2a3654;
+    --input-focus: #22d3ee;
+
+    --shadow-card: none;
+    --shadow-menu: 0 8px 24px rgba(0, 0, 0, 0.4);
+
+    --brand-logo: url("../icons/logo-dark-128.png");
+  }
+}
+
+/* Explicit user overrides (win over prefers-color-scheme). */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f1f5f9;
+  --card-bg: #ffffff;
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --text-heading: #0f172a;
+  --border: #e2e8f0;
+  --divider: rgba(15, 23, 42, 0.08);
+  --primary-bg: #0f172a;
+  --primary-text: #ffffff;
+  --primary-hover: #1e293b;
+  --secondary-border: #06b6d4;
+  --secondary-text: #06b6d4;
+  --secondary-hover-bg: rgba(6, 182, 212, 0.08);
+  --success: #059669;
+  --link: #0284c7;
+  --danger: #dc2626;
+  --hero-avatar: #0f172a;
+  --draftday-bg: #0f172a;
+  --draftday-title: #ffffff;
+  --draftday-body: #cbd5e1;
+  --draftday-btn-bg: #22d3ee;
+  --draftday-btn-text: #0f172a;
+  --input-bg: #ffffff;
+  --input-border: #cbd5e1;
+  --input-focus: #06b6d4;
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-menu: 0 8px 24px rgba(15, 23, 42, 0.16);
+
+  --brand-logo: url("../icons/logo-light-128.png");
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0d1524;
+  --card-bg: #131c31;
+  --text: #f1f5f9;
+  --text-muted: #94a3b8;
+  --text-heading: #ffffff;
+  --border: #1f2a44;
+  --divider: rgba(255, 255, 255, 0.08);
+  --primary-bg: #22d3ee;
+  --primary-text: #0f172a;
+  --primary-hover: #67e8f9;
+  --secondary-border: #22d3ee;
+  --secondary-text: #22d3ee;
+  --secondary-hover-bg: rgba(34, 211, 238, 0.1);
+  --success: #34d399;
+  --link: #22d3ee;
+  --danger: #f87171;
+  --hero-avatar: #f1f5f9;
+  --draftday-bg: #22d3ee;
+  --draftday-title: #0f172a;
+  --draftday-body: #0f172a;
+  --draftday-btn-bg: #0f172a;
+  --draftday-btn-text: #ffffff;
+  --input-bg: #1a2338;
+  --input-border: #2a3654;
+  --input-focus: #22d3ee;
+  --shadow-card: none;
+  --shadow-menu: 0 8px 24px rgba(0, 0, 0, 0.4);
+
+  --brand-logo: url("../icons/logo-dark-128.png");
+}
+
+/* ------------------------------------------------------------------
+   Base
+   ------------------------------------------------------------------ */
+
+* { box-sizing: border-box; }
+
+/* Force the HTML `hidden` attribute to win over class rules that set
+   `display` explicitly (e.g. .welcome-view { display: flex }). Without
+   this, JS setting element.hidden = true has no visible effect because
+   the class rule and the UA `[hidden]` rule have equal specificity, so
+   the later class rule wins. Applied globally so future components
+   can't reintroduce the same bug. */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
 }
 
-.popup {
-  width: 320px;
-  padding: 16px;
-  background: #1a1a2e;
-  color: #fff;
-}
-
-h1 {
-  font-size: 16px;
-  margin: 0 0 12px;
-}
-
-h2 {
-  font-size: 13px;
-  margin: 0 0 8px;
-  color: #a0a0b8;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.section {
-  margin-bottom: 18px;
-  padding-bottom: 18px;
-  border-bottom: 1px solid #2a2a44;
-}
-
-.section:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-  margin-bottom: 0;
-}
+h1, h2, h3 { color: var(--text-heading); }
 
 button {
-  width: 100%;
-  padding: 10px;
-  border: none;
-  border-radius: 6px;
-  background: #4f8cff;
-  color: #fff;
-  font-size: 14px;
+  font-family: inherit;
+  font-size: inherit;
   cursor: pointer;
-}
-
-button:hover:not(:disabled) {
-  background: #3d76e0;
-}
-
-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-button + button {
-  margin-top: 6px;
-}
-
-.field-label {
-  display: block;
-  font-size: 11px;
-  color: #a0a0b8;
-  margin-bottom: 4px;
+  border: none;
+  background: none;
+  padding: 0;
+  color: inherit;
 }
 
 input[type="text"] {
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  padding: 10px 12px;
   width: 100%;
-  box-sizing: border-box;
-  padding: 8px 10px;
-  margin-bottom: 8px;
-  border: 1px solid #2a2a44;
-  border-radius: 6px;
-  background: #12122a;
-  color: #fff;
-  font-size: 13px;
+  transition: border-color 120ms ease;
 }
-
 input[type="text"]:focus {
   outline: none;
-  border-color: #4f8cff;
+  border-color: var(--input-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--input-focus) 20%, transparent);
 }
 
-.status {
-  margin: 10px 0 0;
+/* ------------------------------------------------------------------
+   User bar (only shown when synced) -- doubles as the Settings entry
+   point now that the top app bar is gone (both browsers already show
+   an extension title + close in the panel's own chrome).
+   ------------------------------------------------------------------ */
+
+.user-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--divider);
   font-size: 12px;
-  min-height: 16px;
-  color: #c9c9d8;
+  color: var(--text-muted);
+}
+.user-bar-left {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.username-display {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.link-btn {
+  color: var(--link);
+  text-decoration: underline;
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.link-btn:hover { color: var(--text-heading); }
+
+.settings-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  transition: background 120ms ease;
+}
+.settings-btn:hover,
+.settings-btn[aria-expanded="true"] { background: var(--divider); }
+
+/* ------------------------------------------------------------------
+   Settings dropdown (attached to the Settings button in the user bar)
+   ------------------------------------------------------------------ */
+
+.settings-wrap { position: relative; }
+
+.settings-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 200px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-menu);
+  padding: 6px;
+  z-index: 10;
 }
 
-.status.error {
-  color: #ff6b6b;
-}
-
-.status.success {
-  color: #6bffb0;
-}
-
-.status.subtle {
-  color: #8a8aa8;
+.settings-menu-label {
   font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  padding: 6px 10px 4px;
 }
 
-.field-label.spacer {
-  margin-top: 14px;
+.settings-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+  text-decoration: none;
+}
+.settings-menu-item:hover { background: var(--divider); }
+
+.settings-menu-link {
+  justify-content: space-between;
+}
+.settings-menu-link svg { color: var(--text-muted); flex-shrink: 0; }
+
+/* Beta badge -- used inline next to feature names that aren't fully
+   built yet. Small enough to sit alongside a menu label without
+   dominating it. */
+.beta-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--primary-bg);
+  border: 1px solid var(--primary-bg);
+  border-radius: 4px;
+  padding: 1px 6px;
+  line-height: 1.2;
+}
+.beta-badge-lg { font-size: 11px; padding: 2px 8px; }
+
+.settings-menu-divider {
+  height: 1px;
+  background: var(--divider);
+  margin: 4px 0;
+}
+
+.menu-check {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary-bg);
+  opacity: 0;
+  flex-shrink: 0;
+}
+.settings-menu-item[aria-checked="true"] .menu-check { opacity: 1; }
+
+/* ------------------------------------------------------------------
+   Main content
+   ------------------------------------------------------------------ */
+
+.app-content {
+  padding: 20px 16px 28px;
+  width: 100%;
+  min-width: 300px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+/* ------------------------------------------------------------------
+   Welcome / onboarding
+   ------------------------------------------------------------------ */
+
+.welcome-view {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding-top: 12px;
+}
+/* Hero avatar uses a theme-swapped Draft Pilot mark; --brand-logo is set
+   per-theme block above (logo-light-128.png for light, logo-dark-128.png
+   for dark). */
+.hero-avatar {
+  width: 140px;
+  height: 140px;
+  margin: 16px auto 24px;
+  background-image: var(--brand-logo);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+.hero-title {
+  font-size: 20px;
+  font-weight: 700;
+  text-align: center;
+  margin: 0 0 8px;
+}
+.hero-subtitle {
+  text-align: center;
+  color: var(--text-muted);
+  margin: 0 0 24px;
+}
+.field { margin-bottom: 16px; }
+.field-label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+/* ------------------------------------------------------------------
+   Buttons
+   ------------------------------------------------------------------ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 14px;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease, opacity 120ms ease;
+  border: 1px solid transparent;
+}
+.btn + .btn { margin-top: 8px; }
+.btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.btn-primary {
+  background: var(--primary-bg);
+  color: var(--primary-text);
+}
+.btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+
+.btn-secondary {
+  background: transparent;
+  color: var(--secondary-text);
+  border-color: var(--secondary-border);
+}
+.btn-secondary:hover:not(:disabled) { background: var(--secondary-hover-bg); }
+
+.btn-inverse {
+  background: var(--draftday-btn-bg);
+  color: var(--draftday-btn-text);
+}
+.btn-inverse:hover:not(:disabled) { opacity: 0.9; }
+
+.btn-tiny {
+  width: auto;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+/* ------------------------------------------------------------------
+   Synced state
+   ------------------------------------------------------------------ */
+
+.synced-heading {
+  color: var(--success);
+  font-size: 22px;
+  margin: 4px 0 4px;
+  font-weight: 700;
+}
+.synced-subtitle {
+  margin: 0 0 12px;
+  color: var(--text);
+}
+.summary-list {
+  margin: 0 0 20px;
+  padding-left: 20px;
+  color: var(--text);
+}
+.summary-list li { margin-bottom: 2px; }
+
+/* Condensed sync-status row -- shown on returning sessions in place of
+   the full "We're synced" celebration. */
+.sync-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 12px;
+}
+.sync-status-label {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.sync-status-value {
+  color: var(--success);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sync-status-value.is-error { color: var(--danger); }
+.sync-status-value.is-loading { color: var(--text-muted); }
+
+.icon-btn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--text-muted);
+  transition: background 120ms ease, color 120ms ease;
+  flex-shrink: 0;
+}
+.icon-btn:hover:not(:disabled) {
+  background: var(--divider);
+  color: var(--text-heading);
+}
+.icon-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.resync-btn.is-spinning svg { animation: spin 800ms linear infinite; }
+
+/* ------------------------------------------------------------------
+   Live Draft Mode (placeholder)
+   ------------------------------------------------------------------ */
+
+.mode-crumb {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.live-draft-heading {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+.live-draft-subtitle {
+  color: var(--text-muted);
+  margin: 0 0 16px;
+}
+.card-placeholder {
+  border-style: dashed;
+}
+.feature-list {
+  margin: 4px 0 0;
+  padding-left: 20px;
+  color: var(--text);
+  font-size: 13px;
+}
+.feature-list li { margin-bottom: 6px; }
+
+/* ------------------------------------------------------------------
+   Cards
+   ------------------------------------------------------------------ */
+
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-card);
+}
+.card-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+.card-body {
+  color: var(--text-muted);
+  margin: 0 0 12px;
+  font-size: 13px;
+}
+.card-note {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin: 0 0 12px;
+}
+
+/* Draft Day promotional card */
+.card-draft-day {
+  background: var(--draftday-bg);
+  border-color: transparent;
+}
+.card-draft-day-title {
+  color: var(--draftday-title);
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+.card-draft-day-body {
+  color: var(--draftday-body);
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+
+/* ------------------------------------------------------------------
+   Individual drafts
+   ------------------------------------------------------------------ */
+
+.section-heading {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 8px 0 12px;
 }
 
 .draft-list {
   list-style: none;
   padding: 0;
-  margin: 12px 0 0;
-  max-height: 240px;
-  overflow-y: auto;
+  margin: 0;
+}
+.draft-list-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+.draft-info { flex: 1; min-width: 0; }
+.draft-name {
+  font-weight: 600;
+  color: var(--text-heading);
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.draft-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
 }
 
-.draft-list li {
+/* ------------------------------------------------------------------
+   Status lines
+   ------------------------------------------------------------------ */
+
+.status {
+  margin: 10px 0 0;
+  font-size: 12px;
+  min-height: 16px;
+  color: var(--text-muted);
+}
+.status.subtle { color: var(--text-muted); }
+.status.error { color: var(--danger); }
+.status.success { color: var(--success); }
+
+/* ------------------------------------------------------------------
+   Live Draft Mode
+   ------------------------------------------------------------------ */
+
+.card-error {
+  border-color: var(--danger);
+}
+
+.live-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.live-header-info { min-width: 0; flex: 1; }
+.live-league-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.live-format-line {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.live-status-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text-muted);
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.live-status-badge.is-live {
+  background: color-mix(in srgb, var(--success) 15%, transparent);
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 40%, transparent);
+}
+.live-status-badge.is-pre {
+  background: color-mix(in srgb, var(--text-muted) 12%, transparent);
+}
+.live-status-badge.is-done {
+  background: color-mix(in srgb, var(--text-muted) 10%, transparent);
+}
+
+.live-poll-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+  margin-left: 8px;
+  vertical-align: middle;
+  animation: live-pulse 1.8s ease-in-out infinite;
+}
+.live-poll-indicator.is-error { background: var(--danger); animation: none; }
+.live-poll-indicator.is-idle  { background: var(--text-muted); animation: none; }
+@keyframes live-pulse {
+  0%, 100% { opacity: 1;   transform: scale(1);   }
+  50%      { opacity: 0.35; transform: scale(0.7); }
+}
+
+.live-pick-log {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 0;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.live-pick-log li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: baseline;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.live-pick-log li:last-child { border-bottom: none; }
+.live-pick-log li.is-new {
+  animation: live-pick-flash 1.2s ease-out;
+}
+@keyframes live-pick-flash {
+  0%   { background: color-mix(in srgb, var(--success) 22%, transparent); }
+  100% { background: transparent; }
+}
+.live-pick-no {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  font-size: 11px;
+  min-width: 34px;
+}
+.live-pick-main {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.live-pick-player {
+  font-weight: 600;
+  color: var(--text);
+}
+.live-pick-pos {
+  color: var(--text-muted);
+  font-size: 11px;
+  margin-left: 4px;
+}
+.live-pick-mgr {
+  color: var(--text-muted);
+  font-size: 12px;
+  display: block;
+}
+.live-pick-amt {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--text);
+}
+.live-pick-amt.is-keeper {
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.live-last-updated {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 10px 0 0;
+  text-align: right;
+}
+.live-last-updated.is-error { color: var(--danger); }
+
+/* Current nomination card -- most prominent element in Live Mode */
+.live-nomination-card {
+  border-color: color-mix(in srgb, var(--success) 30%, var(--border));
+}
+.live-nomination-status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.live-nomination-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+.live-nomination-status {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--success);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.live-nomination-status.is-paused { color: var(--text-muted); }
+/* YOUR BID -- filled pill so it stands out from the plain "LIVE" state.
+   Signals ownership at a glance so the user doesn't need to scan the
+   bid history to confirm they're currently top. */
+.live-nomination-status.is-you {
+  color: var(--card-bg);
+  background: var(--success);
+  padding: 3px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.06em;
+}
+.live-nomination-player {
+  margin-bottom: 12px;
+}
+.live-nomination-name {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.2;
+}
+.live-nomination-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px;
-  margin-bottom: 6px;
-  background: #12122a;
-  border-radius: 6px;
+  flex-wrap: wrap;
+}
+/* Tier badge -- inline pill next to position/team. Tier 1 gets a
+   subtle success accent so "elite" pops without shouting. */
+.live-nomination-tier {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--card-bg) 60%, transparent);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.live-nomination-tier.is-elite {
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 45%, var(--border));
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+}
+/* Nominator label -- small "Nominated by X" hint under the meta row.
+   Kept muted so it never competes with the player name / tier badge. */
+.live-nomination-nominator {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.live-nomination-nominator strong {
+  color: var(--text);
+  font-weight: 600;
 }
 
-.draft-list .draft-info {
+/* Nominator sub-line in the completed picks list. */
+.live-pick-nominator {
+  color: var(--text-muted);
+  font-size: 11px;
+  display: block;
+  margin-top: 2px;
+}
+
+/* Post-pick verdict pill in the completed picks list.
+   Reads as: "WR T1 · +$8"  or  "RB T3 · -$4"  or  "TE T2 · at value" */
+.live-pick-verdict {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--card-bg) 60%, transparent);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.live-pick-verdict.is-bargain {
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 40%, var(--border));
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+}
+.live-pick-verdict.is-overpay {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+/* is-fair uses the default muted styling above */
+
+/* Scarcity alert -- lives between the player meta and the value
+   block. Only shown for top-3 tiers with <=1 at-or-above remaining. */
+.live-nomination-scarcity {
+  margin: 10px 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--border));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.live-nomination-scarcity.is-warning {
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 35%, var(--border));
+}
+.live-nomination-scarcity::before {
+  content: '⚠';
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* Compact scarcity readout: label + level badge + reason + "?" info
+   button that toggles a small popover with the explanation. */
+.live-scarcity-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 4px;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+.live-scarcity-label {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted, #6b7280);
+  font-size: 10px;
+}
+.live-scarcity-level {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: color-mix(in srgb, var(--text-muted, #6b7280) 15%, transparent);
+  color: var(--text-muted, #6b7280);
+  border: 1px solid color-mix(in srgb, var(--text-muted, #6b7280) 25%, var(--border));
+}
+.live-scarcity-level.is-low {
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 35%, var(--border));
+}
+.live-scarcity-level.is-medium {
+  background: color-mix(in srgb, #eab308 15%, transparent);
+  color: #a16207;
+  border-color: color-mix(in srgb, #eab308 35%, var(--border));
+}
+.live-scarcity-level.is-high {
+  background: color-mix(in srgb, #f97316 15%, transparent);
+  color: #c2410c;
+  border-color: color-mix(in srgb, #f97316 40%, var(--border));
+}
+.live-scarcity-level.is-critical {
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+}
+.live-scarcity-reason {
+  color: var(--text, inherit);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.live-scarcity-info-btn {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted, #6b7280);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.live-scarcity-info-btn:hover,
+.live-scarcity-info-btn[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--text-muted, #6b7280) 12%, transparent);
+  color: var(--text, inherit);
+}
+.live-scarcity-info-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  width: 260px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.live-scarcity-info-title {
+  font-weight: 700;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+.live-scarcity-info-body {
+  margin: 0 0 8px;
+  color: var(--text, inherit);
+}
+.live-scarcity-info-factors-label {
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted, #6b7280);
+  margin-bottom: 4px;
+}
+.live-scarcity-info-factors {
+  margin: 0 0 8px;
+  padding-left: 18px;
+  color: var(--text, inherit);
+}
+.live-scarcity-info-factors li { margin: 2px 0; }
+.live-scarcity-info-detail {
+  margin: 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 8px;
+  font-size: 11px;
+}
+.live-scarcity-info-detail dt {
+  color: var(--text-muted, #6b7280);
+  font-weight: 600;
+}
+.live-scarcity-info-detail dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.live-scarcity-info-subhead {
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted, #6b7280);
+  margin: 6px 0 4px;
+}
+.live-scarcity-info-context {
+  color: var(--text, inherit);
+}
+
+/* Primary insight — the single most important reason. Fits above the
+   scarcity row, matches the recommendation's visual weight. */
+.live-primary-insight {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  margin: 8px 0;
+  background: color-mix(in srgb, var(--text-muted, #6b7280) 8%, transparent);
+  border: 1px solid var(--border);
+}
+.live-primary-insight.is-critical {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
+}
+.live-primary-insight.is-high {
+  background: color-mix(in srgb, #f97316 12%, transparent);
+  border-color: color-mix(in srgb, #f97316 40%, var(--border));
+}
+.live-primary-insight.is-medium {
+  background: color-mix(in srgb, #eab308 12%, transparent);
+  border-color: color-mix(in srgb, #eab308 40%, var(--border));
+}
+.live-primary-insight-headline {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text, inherit);
+}
+.live-primary-insight-explanation {
+  font-size: 12px;
+  color: var(--text-muted, #6b7280);
+}
+
+/* Value cliff line — short, sits under the primary insight. */
+.live-value-cliff {
+  font-size: 12px;
+  color: var(--text-muted, #6b7280);
+  margin: 4px 0;
+}
+.live-value-cliff-text::before {
+  content: '↘ ';
+  color: var(--danger);
+  font-weight: 700;
+}
+
+/* Pass consequence — small block, structurally like a note. */
+.live-pass-consequence {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 4px 0 8px;
+  font-size: 12px;
+}
+.live-pass-consequence-headline {
+  font-weight: 700;
+  color: var(--text, inherit);
+}
+.live-pass-consequence-blurb {
+  color: var(--text-muted, #6b7280);
+}
+.live-pass-consequence.is-severe .live-pass-consequence-headline { color: var(--danger); }
+.live-pass-consequence.is-significant .live-pass-consequence-headline { color: #c2410c; }
+.live-pass-consequence.is-moderate .live-pass-consequence-headline { color: #a16207; }
+.live-pass-consequence.is-none .live-pass-consequence-headline { color: var(--success); }
+
+/* Alternatives — the strongest 3-5 replacement candidates. */
+.live-alternatives {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  background: var(--surface-alt, rgba(0,0,0,0.02));
+}
+.live-alternatives-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.live-alternatives-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted, #6b7280);
+}
+.live-alternatives-depth {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--surface, #f3f4f6);
+  color: var(--text-muted, #6b7280);
+}
+.live-alternatives-depth.is-strong { background: rgba(16,185,129,0.12); color: var(--success, #059669); }
+.live-alternatives-depth.is-moderate { background: rgba(217,119,6,0.12); color: #a16207; }
+.live-alternatives-depth.is-weak { background: rgba(220,38,38,0.10); color: var(--danger, #b91c1c); }
+.live-alternatives-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.live-alternatives-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 8px;
+  align-items: baseline;
+  padding: 4px 0;
+  font-size: 13px;
+}
+.live-alternatives-row + .live-alternatives-row {
+  border-top: 1px dashed var(--border, #e5e7eb);
+}
+.live-alternatives-name {
+  font-weight: 600;
+  color: var(--text, inherit);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.live-alternatives-score {
+  font-size: 12px;
+  color: var(--text-muted, #6b7280);
+  font-variant-numeric: tabular-nums;
+}
+.live-alternatives-value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.live-alternatives-delta {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted, #6b7280);
+}
+.live-alternatives-delta.is-cheaper { color: var(--success, #059669); }
+.live-alternatives-delta.is-more-expensive { color: #a16207; }
+.live-alternatives-empty {
+  font-size: 12px;
+  color: var(--text-muted, #6b7280);
+  font-style: italic;
+}
+
+/* Positional Market Snapshot — one row per position, compact. */
+.live-market-snapshot-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 0;
+}
+.live-market-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text-muted, #6b7280) 5%, transparent);
+  font-size: 12px;
+}
+.live-market-pos {
+  font-weight: 700;
+  font-size: 13px;
+  min-width: 32px;
+}
+.live-market-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-muted, #6b7280);
+}
+.live-market-dot.is-low { background: var(--success); }
+.live-market-dot.is-medium { background: #eab308; }
+.live-market-dot.is-high { background: #f97316; }
+.live-market-dot.is-critical { background: var(--danger); }
+.live-market-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.live-market-headline { font-weight: 600; }
+.live-market-blurb { color: var(--text-muted, #6b7280); font-size: 11px; }
+.live-nomination-bid-row {
+  display: block;
+}
+.live-nomination-value {
+  border: 1px solid color-mix(in srgb, var(--success) 35%, var(--border));
+  border-radius: 8px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--card-bg) 60%, transparent);
+}
+.live-nomination-sub-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.live-nomination-value-source {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  opacity: 0.75;
+}
+.live-nomination-amount {
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  line-height: 1;
+}
+.live-nomination-bidder,
+.live-nomination-verdict {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.live-nomination-verdict.is-bargain { color: var(--success); font-weight: 700; }
+.live-nomination-verdict.is-overpay { color: var(--danger); font-weight: 700; }
+.live-nomination-stale {
+  font-size: 11px;
+  color: var(--danger);
+  margin: 10px 0 0;
+}
+
+/* "Your team" strip on the nomination card -- now a single stacked
+   label + value (max bid tile removed). */
+.live-nomination-you {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+.live-nom-you-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+.live-nom-you-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin-top: 2px;
+}
+.live-nom-you-value.is-need     { color: var(--success); }
+.live-nom-you-value.is-optional { color: var(--text-muted); font-weight: 600; }
+.live-nom-you-value.is-locked   { color: var(--text-muted); font-weight: 600; }
+
+/* -----------------------------------------------------------------
+   On-the-block recommendation surface
+   -----------------------------------------------------------------
+   Level 1 — the headline (BID TO $54 / PASS / BID IF ≤ $42) is the
+   visual centerpiece. Levels 2 and 3 (fit chip, why, competition)
+   are deliberately smaller so the eye lands on the decision first.
+   -----------------------------------------------------------------*/
+
+/* Level 1 — headline recommendation block. */
+.live-nomination-rec {
+  margin: 14px 0 10px;
+  padding: 14px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--success) 40%, var(--border));
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+  text-align: center;
+}
+.live-nomination-rec.is-pass {
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+.live-nomination-rec.is-conditional {
+  border-color: color-mix(in srgb, var(--warning, #d97706) 40%, var(--border));
+  background: color-mix(in srgb, var(--warning, #d97706) 10%, transparent);
+}
+.live-nomination-rec-headline {
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+  color: var(--success);
+  font-variant-numeric: tabular-nums;
+}
+.live-nomination-rec.is-pass .live-nomination-rec-headline {
+  color: var(--danger);
+}
+.live-nomination-rec.is-conditional .live-nomination-rec-headline {
+  color: var(--warning, #d97706);
+}
+.live-nomination-rec-range {
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+.live-nomination-rec-range b {
+  color: var(--text);
+  font-weight: 700;
+}
+
+/* Roster-aware Max Bid card (bidEngine path).
+   Tighter default palette than the legacy is-pass/is-conditional
+   classes so BUY reads distinctly at a glance -- green for BUY, amber
+   for CAUTION, red for PASS. The .has-yourmax class marks the new
+   layout so legacy styles do not fight the redesigned copy. */
+.live-nomination-rec.has-yourmax {
+  padding: 12px 14px;
+  text-align: left;
+}
+.live-nomination-rec.has-yourmax.is-buy {
+  border-color: color-mix(in srgb, var(--success) 50%, var(--border));
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+}
+.live-nomination-rec.has-yourmax.is-caution {
+  border-color: color-mix(in srgb, var(--warning, #d97706) 50%, var(--border));
+  background: color-mix(in srgb, var(--warning, #d97706) 10%, transparent);
+}
+.live-nomination-rec.has-yourmax.is-pass {
+  border-color: color-mix(in srgb, var(--danger) 50%, var(--border));
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+.live-nomination-rec.has-yourmax .live-nomination-rec-headline {
+  font-size: 24px;
+  text-align: left;
+}
+.live-nomination-rec.has-yourmax.is-buy .live-nomination-rec-headline { color: var(--success); }
+.live-nomination-rec.has-yourmax.is-caution .live-nomination-rec-headline { color: var(--warning, #d97706); }
+.live-nomination-rec.has-yourmax.is-pass .live-nomination-rec-headline { color: var(--danger); }
+.live-nomination-rec.has-yourmax .live-nomination-rec-range {
+  margin-top: 8px;
+  font-size: 12px;
+  text-align: left;
+}
+.live-nomination-rec-reason {
+  color: var(--text);
+  font-weight: 500;
+}
+.live-details-lead {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+/* Level 2 — fit chip. Small colored dot + one-line explanation. */
+.live-nomination-fit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 8px;
+}
+.live-nomination-fit-icon {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--text-muted);
+  flex: 0 0 auto;
+}
+.live-nomination-fit.is-strong .live-nomination-fit-icon { background: var(--success); }
+.live-nomination-fit.is-depth  .live-nomination-fit-icon { background: var(--warning, #d97706); }
+.live-nomination-fit.is-low    .live-nomination-fit-icon { background: var(--danger); }
+.live-nomination-fit.is-strong .live-nomination-fit-text { color: var(--success); }
+.live-nomination-fit.is-low    .live-nomination-fit-text { color: var(--danger); }
+
+/* Level 2 — compact "why" line. Interpunct-separated reasons; kept
+   on one line where possible, wraps cleanly on narrow widths. */
+.live-nomination-why {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin: 0 0 4px;
+}
+.live-nomination-why-label {
+  font-weight: 700;
+  color: var(--text);
+  margin-right: 6px;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+.live-nomination-why-text {
+  font-weight: 600;
+}
+
+/* Level 3 — likely competition. Interpretive summary + up to three
+   compact team chips. The chips are inline pills, not a full table
+   (the roster budgets card owns the exhaustive view). */
+.live-nomination-comp {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+.live-nomination-comp-summary {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.live-nomination-comp-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.live-nomination-comp-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--card-bg) 60%, transparent);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.live-nomination-comp-chip b {
+  color: var(--text);
+  font-weight: 700;
+}
+.live-nomination-threat {
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--border));
+  font-size: 11px;
+  color: var(--text);
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+.live-nomination-threat-label {
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--danger);
+}
+.live-nomination-threat-text {
+  font-weight: 600;
+}
+
+/* Progressive disclosure — expandable "Why this recommendation?"
+   panel. Deep breakdown lives here so the default card stays
+   scannable. */
+.live-nomination-details {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+  font-size: 12px;
+}
+.live-nomination-details > summary {
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  list-style: none;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.live-nomination-details > summary::-webkit-details-marker { display: none; }
+.live-nomination-details > summary::before {
+  content: '▸';
+  display: inline-block;
+  transition: transform 120ms ease-out;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+.live-nomination-details[open] > summary::before { transform: rotate(90deg); }
+.live-nomination-details-list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 12px;
+  row-gap: 4px;
+  margin: 10px 0 8px;
+  font-variant-numeric: tabular-nums;
+}
+.live-nomination-details-list dt {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.live-nomination-details-list dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+}
+.live-nomination-details-caveat {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-style: italic;
+  line-height: 1.4;
+}
+
+/* Collapsible cards -- header becomes a click target, chevron rotates
+   with aria-expanded. Body is toggled via [hidden] so the collapse is
+   real (children don't paint or take height). */
+.card-title-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0 0 6px;
+  color: inherit;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.card-title-toggle:focus-visible {
+  outline: 2px solid var(--success);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.card-toggle-chevron {
+  display: inline-block;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: transform 150ms ease-out;
+}
+.card-title-toggle:hover .card-toggle-chevron { color: var(--text); }
+.card-title-toggle[aria-expanded="false"] .card-toggle-chevron {
+  transform: rotate(-90deg);
+}
+/* When the body is hidden, tighten the header's bottom margin so the
+   collapsed card doesn't leave awkward empty space. */
+.card-title-toggle[aria-expanded="false"] { margin-bottom: 0; }
+
+/* First-run tip in Live Mode -- surfaces once on the first open
+   without a loaded player pool, dismissed permanently via storage. */
+.live-first-run-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border: 1px solid color-mix(in srgb, var(--success) 30%, var(--border));
+  background: color-mix(in srgb, var(--success) 8%, transparent);
+  border-radius: 10px;
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.4;
+}
+.live-first-run-tip-icon {
+  color: var(--success);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.live-first-run-tip-body {
   flex: 1;
   min-width: 0;
 }
+.live-first-run-tip-body strong {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.live-first-run-tip-dismiss {
+  background: none;
+  border: 0;
+  padding: 4px;
+  margin: -2px -4px 0 0;
+  cursor: pointer;
+  color: var(--text-muted);
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.live-first-run-tip-dismiss:hover { color: var(--text); background: color-mix(in srgb, var(--text) 8%, transparent); }
+.live-first-run-tip-dismiss:focus-visible {
+  outline: 2px solid var(--success);
+  outline-offset: 1px;
+}
 
-.draft-list .draft-name {
-  font-size: 13px;
+/* Draft performance scorecard (your team) */
+.live-yt-insight {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 4px 0 12px;
+}
+.live-yt-insight.is-positive { color: var(--success); }
+.live-yt-insight.is-negative { color: var(--danger); }
+.live-yt-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.live-yt-stat {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  background: color-mix(in srgb, var(--card-bg) 60%, transparent);
+  min-width: 0;
+}
+.live-yt-stat-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.live-yt-stat-value {
+  font-size: 18px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  margin-top: 2px;
+  line-height: 1.15;
+}
+.live-yt-stat-value.is-positive { color: var(--success); }
+.live-yt-stat-value.is-negative { color: var(--danger); }
+.live-yt-stat-detail {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.draft-list .draft-meta {
+/* Auction inflation panel — designed for one-second reads. Single big
+   number, a plain-language interpretation, one line of advice, one
+   compact supporting stat row. No sparkline, no stat grid. */
+.live-infl-headline {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 2px 0 6px;
+}
+.live-infl-factor {
+  font-size: 32px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+.live-infl-factor.is-positive { color: var(--success); }
+.live-infl-factor.is-negative { color: var(--danger); }
+.live-infl-factor-word {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.live-infl-arrow {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-left: auto;
+  line-height: 1;
+}
+.live-infl-arrow.is-positive { color: var(--success); }
+.live-infl-arrow.is-negative { color: var(--danger); }
+.live-infl-interp {
+  margin: 0 0 2px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.3;
+}
+.live-infl-advice {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.4;
+}
+.live-infl-support {
+  margin: 0;
   font-size: 11px;
-  color: #a0a0b8;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
 }
 
-.draft-list button {
-  width: auto;
-  padding: 6px 10px;
-  font-size: 12px;
-  flex-shrink: 0;
+/* Nomination suggester list */
+.live-suggester-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
 }
+.live-suggester-list li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.live-suggester-list li:last-child { border-bottom: none; }
+.live-suggester-list li.is-self-need {
+  opacity: 0.7;
+}
+.live-suggester-player {
+  min-width: 0;
+}
+.live-suggester-name {
+  font-weight: 700;
+  color: var(--text);
+  font-size: 13px;
+}
+.live-suggester-meta {
+  color: var(--text-muted);
+  font-size: 11px;
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.live-suggester-reason {
+  color: var(--text-muted);
+  font-size: 11px;
+  margin-top: 2px;
+  font-style: italic;
+}
+.live-suggester-footnote {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 10px 0 0;
+  font-style: italic;
+}
+.live-suggester-tier-pill {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+.live-suggester-tier-pill.is-elite {
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 40%, var(--border));
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+}
+
+/* Team budgets table */
+.live-budgets-scroll {
+  overflow-x: auto;
+  max-height: 340px;
+  overflow-y: auto;
+}
+.live-budgets-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.live-budgets-table th,
+.live-budgets-table td {
+  padding: 6px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.live-budgets-table th {
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  position: sticky;
+  top: 0;
+  background: var(--card-bg);
+  z-index: 1;
+}
+.live-budgets-num { text-align: right; }
+.live-budgets-table td.live-budgets-num { color: var(--text); font-weight: 600; }
+.live-budgets-mgr {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.live-budgets-table tr.is-you td { background: color-mix(in srgb, var(--success) 8%, transparent); }
+.live-budgets-table tr.is-broke td.live-budgets-num:first-of-type { color: var(--danger); }
+
+/* Bidder-relevance styling: green tint for teams likely to compete on
+   the current nomination, faded for teams that can't. Overlays cleanly
+   on top of .is-you so your own row still stands out. */
+.live-budgets-table tr.is-likely-bidder td {
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+}
+.live-budgets-table tr.is-likely-bidder.is-you td {
+  background: color-mix(in srgb, var(--success) 22%, transparent);
+}
+.live-budgets-table tr.is-out-of-race td {
+  opacity: 0.5;
+}
+.live-budgets-needs {
+  text-align: left;
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 11px;
+  /* Allow the cell to wrap onto multiple lines so every starter need
+     is legible even at narrow side-panel widths. Word-break by comma
+     boundaries preferred over mid-token breaks. */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+.live-budgets-table td.live-budgets-needs {
+  color: var(--text);
+  font-weight: 500;
+  vertical-align: top;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+/* Open bench slots column -- narrow right-aligned number */
+.live-budgets-bench {
+  text-align: right;
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 11px;
+  white-space: nowrap;
+  width: 1%;
+}
+.live-budgets-table td.live-budgets-bench {
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.live-budgets-table td.live-budgets-bench.is-zero { color: var(--text-muted); font-weight: 500; }
+.live-budgets-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 8px 0 0;
+  font-style: italic;
+}
+
+/* ==================================================================
+   Simplified Live Mode surfaces
+   ------------------------------------------------------------------
+   Three tiers on the On-the-Block card:
+     Tier 1  live-nomination-rec              (existing, dominant)
+     Tier 2  live-context                     (NEW composed sentence)
+     Tier 3  live-competition                 (NEW composed sentence)
+   A single tri-step severity system — is-calm / is-warn / is-alert —
+   is applied ONLY to the context line (and to the rec headline via
+   its existing is-pass / is-conditional classes). Alternatives, tier
+   badge, and inflation chip carry no severity color.
+   ================================================================== */
+
+/* Tier 2 — composed primary context sentence. Reads as a single
+   sentence with slightly more visual weight than the meta row, but
+   dramatically less than the recommendation. */
+.live-context {
+  margin: 4px 0 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border-left: 3px solid var(--border);
+  background: color-mix(in srgb, var(--card-bg) 70%, transparent);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+  font-weight: 500;
+}
+.live-context.is-calm  { border-left-color: color-mix(in srgb, var(--success) 60%, var(--border)); }
+.live-context.is-warn  { border-left-color: color-mix(in srgb, var(--warning, #d97706) 65%, var(--border)); }
+.live-context.is-alert { border-left-color: color-mix(in srgb, var(--danger) 60%, var(--border)); }
+.live-context-text { display: block; }
+
+/* Tier 3 — competition sentence. Muted; supporting context, not the
+   decision. No border, no background — a plain line. */
+.live-competition {
+  margin: 0 0 10px;
+  padding: 0 2px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+.live-competition-text { font-weight: 500; }
+
+/* Neutralize the tier badge — no more elite-green accent competing
+   with the composed context sentence for the eye. */
+.live-nomination-tier.is-elite {
+  color: var(--text-muted);
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--card-bg) 60%, transparent);
+}
+
+/* Compact Alternatives row — top 2 shown by default. Name + $ + short
+   qualitative label. No percentages, no delta chips, no depth chip. */
+.live-alternatives-label-inline {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--card-bg) 60%, transparent);
+  border: 1px solid var(--border);
+  margin-left: auto;
+}
+.live-alternatives-more {
+  list-style: none;
+  padding: 6px 0 0;
+  text-align: right;
+}
+
+/* Details panel — the single place all deeper analytical layers live
+   (fit, scarcity, cliff, pass consequence, full alternatives, per-lift
+   breakdown, methodology). Collapsed by default. */
+.live-details-body {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 6px;
+}
+.live-details-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.live-details-row-block {
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
+.live-details-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding-top: 2px;
+}
+.live-details-value { color: var(--text); }
+.live-details-alt-list {
+  margin: 0;
+  padding-left: 16px;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.live-details-breakdown {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 12px;
+  row-gap: 3px;
+  margin: 2px 0 0;
+  font-size: 12px;
+}
+.live-details-breakdown dt { color: var(--text-muted); }
+.live-details-breakdown dd {
+  margin: 0;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  text-align: right;
+}
+
+/* Compact card variant — used by the inflation chip and the
+   filtered positional market. Less padding, no card title chrome. */
+.card-compact { padding: 8px 12px; }
+
+/* Ambient inflation chip — the entire header IS the summary. Click
+   to reveal interpretation / advice / supporting math. */
+.live-infl-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 2px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  color: var(--text);
+  text-align: left;
+}
+.live-infl-chip:focus-visible {
+  outline: 2px solid var(--accent, currentColor);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.live-infl-chip-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.live-infl-word {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+.live-infl-word.is-positive {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+.live-infl-word.is-negative {
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 40%, var(--border));
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+}
+.live-infl-chip .card-toggle-chevron {
+  margin-left: auto;
+  color: var(--text-muted);
+  transition: transform 120ms ease;
+}
+.live-infl-chip[aria-expanded="true"] .card-toggle-chevron {
+  transform: rotate(180deg);
+}
+.card-compact .card-collapsible-body { padding-top: 6px; }
+
+/* Positional Market — "See positional market" toggle link when the
+   card is filtered to just the nominated position. */
+.live-market-snapshot-toggle {
+  display: block;
+  margin: 6px 0 0;
+  font-size: 11px;
+  text-align: right;
+}
+
+/* Demoted "Export current draft room" footer — the CSV export is not
+   an in-draft action, so it lives as a small link at the bottom of the
+   Live view rather than a primary-styled card. */
+.live-export-footer {
+  margin-top: 20px;
+  padding: 8px 12px 4px;
+  text-align: center;
+  border-top: 1px solid var(--border);
+  opacity: 0.75;
+}
+.live-export-footer .link-btn {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.live-export-footer .link-btn:hover { color: var(--text); }
+.status-inline {
+  display: inline-block;
+  margin: 4px 0 0;
+  font-size: 11px;
+}
+

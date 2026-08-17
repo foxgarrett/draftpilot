@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- Rounded navy background matching the popup's brand color. -->
+  <rect width="128" height="128" rx="24" fill="#1a1a2e"/>
+
+  <!-- Paper airplane pointing upper-right. Two triangles + fold line
+       create the classic paper-plane silhouette. Scaled and positioned
+       so it fills most of the icon while leaving safe padding for the
+       16px rendering. -->
+  <g transform="translate(20 30) rotate(-8 44 34)">
+    <!-- Top wing (lighter fill) -->
+    <path d="M 0 34 L 88 8 L 44 40 Z" fill="#ffffff"/>
+    <!-- Bottom wing / underside (accent blue, gives depth) -->
+    <path d="M 0 34 L 44 40 L 30 60 Z" fill="#4f8cff"/>
+  </g>
+</svg>
