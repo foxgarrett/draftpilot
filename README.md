@@ -29,6 +29,15 @@
 
 ---
 
+## Quick start
+
+> **Draft Pilot** is a free browser extension for [Sleeper](https://sleeper.com) auction leagues.
+> It answers **"what's the most I should pay for this player, right now?"** — every nomination, in real time.
+
+**👉 [Install in 5 minutes ↓](#install)**
+
+---
+
 ## 🚧 This is a beta — and I want your feedback
 
 Draft Pilot is a personal project I built for the 2025 season. It works well
@@ -71,6 +80,17 @@ actually pays.
 Load any past draft's full pick history (drafter, price, keeper flag, etc.)
 to a CSV — great for hand-off to ChatGPT/Claude for smarter predictions, or
 for spreadsheet nerds who want to build their own models.
+
+---
+
+## See it in action
+
+<p align="center">
+  <img src="docs/demo-auction-coaching.gif" alt="Draft Pilot auction coaching demo — live bid recommendations, roster context, and next-nomination strategy updating in real time as an auction unfolds." width="900">
+</p>
+
+Want to see a specific feature demo'd next?
+[Tell me in Discussions](../../discussions).
 
 ---
 
@@ -163,6 +183,16 @@ should do; you still click the buttons.
 </details>
 
 <details>
+<summary><b>Does it work on mobile?</b></summary>
+
+Not today. Draft Pilot is a desktop browser extension — Chrome/Edge/Brave/Arc
+or Firefox on Mac, Windows, or Linux. Sleeper's mobile app doesn't support
+extensions. If you draft on mobile, a common workflow is to keep a laptop
+open next to you with Draft Pilot for coaching, and bid on your phone.
+
+</details>
+
+<details>
 <summary><b>How does "Your Max Bid" actually work?</b></summary>
 
 It's a roster-aware model that reasons across: your open roster slots, your
@@ -179,9 +209,10 @@ the Fair Value range. All open-source — see
 <details>
 <summary><b>Why isn't this on the Chrome Web Store or Firefox Add-ons?</b></summary>
 
-Store submission takes time and I'd rather ship the season-two version with
-your feedback baked in. For 2025, GitHub install is the plan. If enough
-people use it, store listings are on the 2026 roadmap.
+Store submission takes time and I'd rather ship the next version with your
+feedback baked in. For the 2026 season, GitHub install is the plan. The
+**v0.4 release — targeting the 2027 draft season — will be built with your
+feedback** and is the version I'd like to submit to the stores.
 
 </details>
 
@@ -212,14 +243,34 @@ extension in `chrome://extensions`.
 
 ---
 
-## Feedback
+## Feedback & community
 
-**Draft Pilot is a beta and your feedback is what makes v0.4 better.** No
-issue is too small — bugs, confusing labels, missing features, "this UI
-element is ugly", "the recommendation was wrong for X reason", all of it.
+**Draft Pilot is a beta and your feedback is what makes v0.4 (2027 season)
+better.** No note is too small — bugs, confusing labels, missing features,
+"this UI element is ugly", "the recommendation was wrong for X reason", all
+of it.
 
-- 🐛 **Bugs & requests** → [open a GitHub issue](../../issues)
-- 💬 **General thoughts** → find me on [GitHub](https://github.com/foxgarrett)
+- 🐛 **Bugs & feature requests** → [open a GitHub issue](../../issues)
+- 💬 **Questions, strategy talk, general feedback** → [start a Discussion](../../discussions)
+- 👋 **Just want to say hi or share your league story** → also [Discussions](../../discussions) — I read everything
+
+### What's especially helpful to hear about
+- League format details (teams, budget, roster slots) when a recommendation felt off
+- Sleeper draft URLs where the parser failed (I'll investigate; no login data is shared)
+- "I wanted X and couldn't find it" — pure UX friction
+- What you'd want the *next* version to do
+
+---
+
+## Support the project
+
+Draft Pilot is free and always will be. If it helped you draft a better team,
+here are no-cost ways to help back:
+
+- ⭐ **Star this repo** — signal boost matters more than you'd think
+- 📣 **Share it** in your league chat / on r/fantasyfootball / with a friend
+- 🐛 **File one piece of feedback** during or after your draft — even one line
+- 🔧 **Contribute code** — bug fixes and small features welcome (see [ARCHITECTURE.md](ARCHITECTURE.md))
 
 ---
 
