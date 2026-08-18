@@ -78,12 +78,18 @@ for spreadsheet nerds who want to build their own models.
 
 > ⏱️ Takes about 5 minutes. No account, no signup, no payment.
 
-### Step 1 — Download the code
+### Step 1 — Download the extension
+
+**👉 [Download the latest release (ZIP)](https://github.com/foxgarrett/draftpilot/releases/latest)** — grab `draft-pilot-vX.Y.Z.zip` from the Assets section and unzip it somewhere you'll remember.
+
+<details>
+<summary><i>Prefer git? (for contributors / auto-updates via <code>git pull</code>)</i></summary>
+
 ```bash
 git clone https://github.com/foxgarrett/draftpilot.git
 ```
-Or click the green **Code → Download ZIP** button at the top of this page and
-unzip it somewhere you'll remember.
+
+</details>
 
 ### Step 2 — Load it in your browser
 
