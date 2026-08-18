@@ -23,6 +23,10 @@
   <img src="https://img.shields.io/badge/version-0.3.0-informational" alt="v0.3.0">
 </p>
 
+<p align="center">
+  <img src="docs/Hero.png" alt="Draft Pilot side panel coaching a live Sleeper auction — showing a $25 max bid on Kenneth Walker, roster context, competing bidders, and pass alternatives." width="900">
+</p>
+
 ---
 
 ## 🚧 This is a beta — and I want your feedback
