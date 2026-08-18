@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Draft Pilot",
-  "version": "0.1.0",
-  "description": "Export your Sleeper Fantasy Football draft room to CSV.",
+  "version": "0.3.0",
+  "description": "Sleeper Fantasy Football auction coach: live bid recommendations, nomination strategy, and CSV export of your draft room and past drafts.",
   "action": {
     "default_title": "Draft Pilot",
     "default_icon": {

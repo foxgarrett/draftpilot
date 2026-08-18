@@ -202,7 +202,8 @@ input[type="text"] {
   width: 100%;
   transition: border-color 120ms ease;
 }
-input[type="text"]:focus {
+input[type="text"]:focus { outline: none; }
+input[type="text"]:focus-visible {
   outline: none;
   border-color: var(--input-focus);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--input-focus) 20%, transparent);
@@ -725,14 +726,27 @@ input[type="text"]:focus {
   padding: 8px 0;
   border-bottom: 1px solid var(--border);
   font-size: 13px;
+  position: relative;
 }
 .live-pick-log li:last-child { border-bottom: none; }
-.live-pick-log li.is-new {
-  animation: live-pick-flash 1.2s ease-out;
+/* New-pick flash: an absolutely-positioned overlay whose opacity is
+   animated. Avoids repainting the row's background (and its children)
+   on every frame. pointer-events:none so the overlay never intercepts
+   clicks on child controls, and z-index:0 keeps it behind the text. */
+.live-pick-log li.is-new::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--success) 22%, transparent);
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 0;
+  animation: live-pick-flash 1.2s ease-out forwards;
 }
+.live-pick-log li.is-new > * { position: relative; z-index: 1; }
 @keyframes live-pick-flash {
-  0%   { background: color-mix(in srgb, var(--success) 22%, transparent); }
-  100% { background: transparent; }
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
 }
 .live-pick-no {
   font-variant-numeric: tabular-nums;
@@ -783,37 +797,9 @@ input[type="text"]:focus {
 .live-nomination-card {
   border-color: color-mix(in srgb, var(--success) 30%, var(--border));
 }
-.live-nomination-status-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 6px;
-}
-.live-nomination-label {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
-}
-.live-nomination-status {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--success);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-.live-nomination-status.is-paused { color: var(--text-muted); }
-/* YOUR BID -- filled pill so it stands out from the plain "LIVE" state.
-   Signals ownership at a glance so the user doesn't need to scan the
-   bid history to confirm they're currently top. */
-.live-nomination-status.is-you {
-  color: var(--card-bg);
-  background: var(--success);
-  padding: 3px 8px;
-  border-radius: 999px;
-  letter-spacing: 0.06em;
-}
+/* Status pill (.live-nomination-status-row, .live-nomination-status)
+   removed -- LIVE/PAUSED lives near the Live Draft Mode header and
+   YOUR BID surfaces inside the decision block. */
 .live-nomination-player {
   margin-bottom: 12px;
 }
@@ -1775,64 +1761,482 @@ input[type="text"]:focus {
   padding-top: 8px;
 }
 
-/* Nomination suggester list */
-.live-suggester-list {
-  list-style: none;
-  padding: 0;
-  margin: 8px 0 0;
+/* Next Nomination -- primary rec dominates, secondaries stay quiet. */
+
+/* Strategy tab bar. Segmented control at narrow extension widths so
+   three labels never wrap or overflow. */
+.next-nom-strategy-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  margin: 0 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--card-bg) 60%, transparent);
 }
-.live-suggester-list li {
-  padding: 8px 0;
-  border-bottom: 1px solid var(--border);
-}
-.live-suggester-list li:last-child { border-bottom: none; }
-.live-suggester-list li.is-self-need {
-  opacity: 0.7;
-}
-.live-suggester-player {
+.next-nom-tab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 7px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-right: 1px solid var(--border);
   min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.live-suggester-name {
+.next-nom-tab:last-child { border-right: none; }
+.next-nom-tab:hover { color: var(--text); }
+.next-nom-tab[aria-selected="true"] {
+  background: var(--text);
+  color: var(--card-bg);
+}
+.next-nom-tab:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--text) 40%, transparent);
+  outline-offset: -2px;
+}
+
+.next-nom-recommends {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin: 0 0 8px;
+}
+.next-nom-recommends span {
+  color: var(--text);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.next-nom-avoid-toggle {
+  display: block;
+  margin: 10px 0 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-decoration: underline;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.next-nom-avoid-toggle:hover { color: var(--text); }
+.next-nom-avoid-toggle.is-avoiding { color: var(--text); }
+
+.next-nom-primary {
+  margin-top: 4px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--card-bg) 70%, transparent);
+}
+.next-nom-strategy {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.next-nom-strategy.is-drain,
+.next-nom-strategy.is-distract {
+  color: var(--warning, #d97706);
+}
+.next-nom-strategy.is-target {
+  color: var(--success);
+}
+.next-nom-strategy.is-wait {
+  color: var(--danger);
+}
+.next-nom-player {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+.next-nom-name {
+  font-size: 17px;
   font-weight: 700;
   color: var(--text);
-  font-size: 13px;
+  line-height: 1.15;
 }
-.live-suggester-meta {
-  color: var(--text-muted);
+.next-nom-meta {
   font-size: 11px;
-  margin-top: 2px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+.next-nom-value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+.next-nom-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.next-nom-market {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+.next-nom-market.is-up { color: var(--warning, #d97706); }
+.next-nom-market.is-down { color: var(--success); }
+
+.next-nom-bidders {
+  margin: 0 0 10px;
+  padding: 8px 0 0;
+  border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+}
+.next-nom-bidders-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.next-nom-bidders-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.next-nom-bidder {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text);
+}
+.next-nom-bidder-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.next-nom-bidder-budget {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+.next-nom-reason {
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--text-muted);
+  margin: 0 0 10px;
+}
+.next-nom-action {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 7px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--text);
+  color: var(--card-bg);
+  cursor: pointer;
+}
+.next-nom-action:hover {
+  opacity: 0.9;
+}
+.next-nom-action.is-copied {
+  background: var(--success);
+  border-color: var(--success);
+  color: var(--card-bg);
+}
+
+.next-nom-others {
+  margin-top: 12px;
+}
+.next-nom-others-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.next-nom-others-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.next-nom-other {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 0;
+  font-size: 12.5px;
+  border-bottom: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+}
+.next-nom-other:last-child { border-bottom: none; }
+.next-nom-other-name {
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.next-nom-other-value {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+.next-nom-other-strategy {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.next-nom-other-strategy.is-drain,
+.next-nom-other-strategy.is-distract {
+  color: var(--warning, #d97706);
+}
+.next-nom-other-strategy.is-target { color: var(--success); }
+
+.next-nom-empty {
+  margin-top: 4px;
+  padding: 12px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: transparent;
+}
+.next-nom-empty .next-nom-reason { margin-bottom: 0; }
+
+/* Available players — compact live-market list. */
+.avail-summary {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.avail-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.avail-search {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+}
+.avail-search:focus-visible {
+  border-color: var(--input-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--input-focus) 20%, transparent);
+}
+.avail-position-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.avail-chip {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.avail-chip:hover { color: var(--text); }
+.avail-chip.is-active {
+  color: var(--card-bg);
+  background: var(--text);
+  border-color: var(--text);
+}
+.avail-sort {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
 }
-.live-suggester-reason {
+.avail-sort-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   color: var(--text-muted);
+}
+.avail-sort-select {
+  font-size: 12px;
+  padding: 3px 6px;
+  color: var(--text);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  flex: 1 1 auto;
+}
+.avail-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.avail-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+}
+.avail-row:last-child { border-bottom: none; }
+.avail-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.avail-value {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.avail-meta {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.avail-fit {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: var(--success);
+  border: 1px solid color-mix(in srgb, var(--success) 40%, var(--border));
+  background: color-mix(in srgb, var(--success) 8%, transparent);
+}
+.avail-fit.is-bench {
+  color: var(--text-muted);
+  border-color: var(--border);
+  background: transparent;
+}
+.avail-market {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.avail-market.is-up { color: var(--warning, #d97706); }
+.avail-market.is-down { color: var(--success); }
+.avail-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 12px 0 0;
+  text-align: center;
+}
+.avail-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+}
+.avail-page-btn {
   font-size: 11px;
-  margin-top: 2px;
-  font-style: italic;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  color: var(--text);
+  background: transparent;
+  cursor: pointer;
+}
+.avail-page-btn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--text) 30%, var(--border));
+}
+.avail-page-btn:disabled {
+  color: var(--text-muted);
+  cursor: default;
+  opacity: 0.5;
+}
+.avail-page-status {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.live-suggester-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 10px;
 }
 .live-suggester-footnote {
   font-size: 11px;
   color: var(--text-muted);
-  margin: 10px 0 0;
+  margin: 0;
   font-style: italic;
+  flex: 1 1 auto;
+  min-width: 0;
 }
-.live-suggester-tier-pill {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  padding: 1px 5px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
+.live-suggester-refresh {
+  font-size: 11px;
   color: var(--text-muted);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  flex: 0 0 auto;
 }
-.live-suggester-tier-pill.is-elite {
-  color: var(--success);
-  border-color: color-mix(in srgb, var(--success) 40%, var(--border));
-  background: color-mix(in srgb, var(--success) 10%, transparent);
-}
+.live-suggester-refresh:hover { color: var(--text); }
 
 /* Team budgets table */
 .live-budgets-scroll {
@@ -2109,6 +2513,47 @@ input[type="text"]:focus {
 }
 .card-compact .card-collapsible-body { padding-top: 6px; }
 
+/* Auction temperature header -- two-line stack: uppercase kicker on top,
+   plain-language summary phrase below. Replaces the old chip layout
+   (Inflation label + raw factor + FROZEN word). */
+.live-infl-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.live-infl-summary {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+}
+.live-infl-summary.is-positive { color: var(--danger); }
+.live-infl-summary.is-negative { color: var(--success); }
+
+/* Compact body -- support row + advice + freshness footnote,
+   tightened so the card stays short. */
+.card-compact .card-collapsible-body { padding-top: 4px; }
+.live-infl-support {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.live-infl-advice {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--text);
+  line-height: 1.35;
+}
+.live-infl-freshness {
+  margin: 6px 0 0;
+  font-size: 10.5px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 /* Positional Market — "See positional market" toggle link when the
    card is filtered to just the nominated position. */
 .live-market-snapshot-toggle {
@@ -2137,5 +2582,1032 @@ input[type="text"]:focus {
   display: inline-block;
   margin: 4px 0 0;
   font-size: 11px;
+}
+
+/* ==================================================================
+   On-the-Block card refresh
+   ------------------------------------------------------------------
+   Layout-only refresh of the primary Live-Mode decision surface.
+   Keeps the existing tri-state color logic (buy/caution/pass), the
+   existing type scale, and the existing light/dark token system --
+   only structural styling changes here (radius, chips, mini-grid,
+   left-accent bar on the decision block, elevated competition
+   sub-card, outlined alternatives chip, header "See all" link,
+   chevroned Details summary).
+   ================================================================== */
+
+/* Card shell -- larger radius, neutral border (drops the success
+   tint that used to color the whole card), soft ambient shadow. */
+.live-nomination-card {
+  border-color: var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card, 0 1px 2px rgba(15, 23, 42, 0.04)),
+              0 4px 20px color-mix(in srgb, var(--text) 6%, transparent);
+}
+
+/* Position/team meta rendered as a chip alongside the tier badge so
+   both identifiers read as equal-weight tags. */
+#live-nomination-meta,
+#live-prototype-meta {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--card-bg) 60%, transparent);
+  color: var(--text);
+  white-space: nowrap;
+}
+
+/* Nominator line -- inline icon + text. Icon inherits color so it
+   reads muted alongside the label but tracks the theme. */
+.live-nomination-nominator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.live-nomination-nominator-icon {
+  flex: 0 0 auto;
+  opacity: 0.7;
+}
+
+/* Decision block -- left accent bar keyed to the same tri-state
+   color as the headline. Uses the has-yourmax variant added by the
+   bidEngine path; legacy is-pass/is-conditional still work. */
+.live-nomination-rec {
+  position: relative;
+  overflow: hidden;
+}
+.live-nomination-rec::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--success);
+}
+.live-nomination-rec.is-pass::before,
+.live-nomination-rec.has-yourmax.is-pass::before {
+  background: var(--danger);
+}
+.live-nomination-rec.is-conditional::before,
+.live-nomination-rec.has-yourmax.is-caution::before {
+  background: var(--warning, #d97706);
+}
+
+/* Headline row inside the decision block -- headline on the left,
+   "Your bid" ownership badge on the right when the user is the top
+   bidder. Wraps to a new line on narrow widths so a long headline
+   never squeezes the badge. */
+.live-nomination-rec-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.live-nomination-rec-badge {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--success);
+  color: var(--card-bg);
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.live-nomination-rec.has-yourmax.is-caution .live-nomination-rec-badge {
+  background: var(--warning, #d97706);
+}
+.live-nomination-rec.has-yourmax.is-pass .live-nomination-rec-badge,
+.live-nomination-rec.is-pass .live-nomination-rec-badge {
+  background: var(--danger);
+}
+
+/* Plain-language reason under the headline (bidEngine path). Kept
+   at body weight so the headline still dominates. */
+.live-nomination-rec-reason-line {
+  margin: 6px 0 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* 3-column mini-grid -- Fair Value / Current Bid / Room. Divider
+   above separates it from the headline+reason without a full border. */
+.live-nomination-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+}
+.live-nomination-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.live-nomination-metric-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.live-nomination-metric-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.live-nomination-metric-value.is-positive { color: var(--success); }
+.live-nomination-metric-value.is-negative { color: var(--danger); }
+
+/* Context sentence -- restyled to match the mock: plain italic
+   muted quote with a soft left rule, no background, no radius. The
+   Insight Priority severity classes (is-calm/is-warn/is-alert) still
+   color the left rule. Overrides the earlier .live-context rule
+   further up the file. */
+.live-context {
+  padding: 2px 0 2px 12px;
+  margin: 10px 0;
+  background: none;
+  border: none;
+  border-left: 2px solid var(--border);
+  border-radius: 0;
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 400;
+}
+.live-context.is-calm  { border-left-color: color-mix(in srgb, var(--success) 60%, var(--border)); }
+.live-context.is-warn  { border-left-color: color-mix(in srgb, var(--warning, #d97706) 65%, var(--border)); }
+.live-context.is-alert { border-left-color: color-mix(in srgb, var(--danger) 60%, var(--border)); }
+
+/* Competition sub-card -- elevated block with warning icon so it
+   reads as a distinct "watch out" beat rather than another line. */
+.live-competition {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  margin: 8px 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  color: var(--text);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.live-competition-icon {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--warning, #d97706);
+}
+.live-competition-text { color: var(--text); font-weight: 500; }
+
+/* Alternatives -- flat container (no nested panel background), but
+   a top rule + top padding so the section reads as clearly separate
+   from the competition sub-card above. Header hosts the "See all N →"
+   CTA opposite the label; rows get an elevated background + outlined
+   "Strong" chip instead of a plain inline label. */
+.live-alternatives {
+  padding: 12px 0 0;
+  border: none;
+  background: none;
+  border-top: 1px solid var(--border);
+  margin-top: 12px;
+}
+.live-alternatives-header {
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.live-alternatives-see-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--link);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.live-alternatives-see-all:hover { color: var(--text); }
+.live-alternatives-row {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  border: 1px solid var(--border);
+  align-items: center;
+}
+.live-alternatives-row + .live-alternatives-row {
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+.live-alternatives-label-inline {
+  color: var(--link);
+  border-color: color-mix(in srgb, var(--link) 45%, var(--border));
+  background: color-mix(in srgb, var(--link) 8%, transparent);
+}
+
+/* Details summary -- new chevron SVG replaces the ::before glyph
+   and rotates on open. */
+.live-nomination-details > summary.live-nomination-details-summary {
+  justify-content: space-between;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12px;
+  color: var(--text);
+}
+.live-nomination-details > summary.live-nomination-details-summary::before {
+  content: none;
+}
+.live-nomination-details-chevron {
+  transition: transform 120ms ease-out;
+  color: var(--text-muted);
+  flex: 0 0 auto;
+}
+.live-nomination-details[open] > summary.live-nomination-details-summary .live-nomination-details-chevron {
+  transform: rotate(180deg);
+}
+
+/* ==================================================================
+   On-the-Block hierarchy pass
+   ------------------------------------------------------------------
+   Player name and the BID TO $X headline become the two visual
+   anchors of the whole page. Supporting metrics shrink; secondary
+   sub-cards flatten so the decision block is the only strongly
+   framed container inside the card.
+   ================================================================== */
+
+.live-nomination-card {
+  padding: 18px 18px 16px;
+  box-shadow: var(--shadow-card, 0 1px 2px rgba(15, 23, 42, 0.04)),
+              0 8px 28px color-mix(in srgb, var(--text) 10%, transparent);
+}
+
+.live-nomination-name {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.live-nomination-rec.has-yourmax {
+  padding: 14px 16px 14px 18px;
+  margin: 14px 0 12px;
+}
+.live-nomination-rec.has-yourmax .live-nomination-rec-headline {
+  font-size: 40px;
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: 0.005em;
+}
+
+/* Metrics row -- clearly supporting, not competing with the headline. */
+.live-nomination-metrics {
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 10px;
+}
+.live-nomination-metric-label {
+  font-size: 9px;
+}
+.live-nomination-metric-value {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Reason line now sits under the metrics; kept quiet so the number
+   above still owns the eye. */
+.live-nomination-rec-reason-line {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* Competition -- flatten: no background, no bordered box. Icon +
+   left rule carries the "watch out" beat instead. */
+.live-competition {
+  padding: 6px 0 6px 12px;
+  margin: 8px 0;
+  border: none;
+  border-left: 2px solid color-mix(in srgb, var(--warning, #d97706) 55%, var(--border));
+  border-radius: 0;
+  background: none;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.live-competition-text { color: var(--text-muted); font-weight: 500; }
+
+/* Alternatives -- rows flatten to bare list items. Header label
+   drops to secondary weight. */
+.live-alternatives {
+  margin-top: 14px;
+  padding-top: 10px;
+}
+.live-alternatives-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+}
+.live-alternatives-row {
+  padding: 6px 0;
+  background: none;
+  border: none;
+  border-radius: 0;
+}
+.live-alternatives-row + .live-alternatives-row {
+  border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  margin-top: 0;
+}
+/* Two-line row: [name] ................. [$value]
+                 <plain-language context clause> */
+.live-alternatives-row {
+  display: block;
+  padding: 8px 0;
+}
+.live-alternatives-row-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.live-alternatives-row .live-alternatives-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.live-alternatives-row .live-alternatives-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+.live-alternatives-context {
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+/* "Why this recommendation?" panel -- dynamic heading + a ranked
+   plain-language bullet list. Kept quiet so the primary card stays
+   the visual anchor when the panel is open. */
+.live-details-why-heading {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+.live-details-why-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  color: var(--text);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.live-details-why-list li::marker {
+  color: var(--text-muted);
+}
+
+/* Subtle expand/collapse animation. Uses the modern
+   ::details-content pseudo + interpolate-size so height animates
+   from 0 to auto; falls back to an instant reveal on browsers that
+   don't support it. Chrome (this extension's target) supports it. */
+@supports (interpolate-size: allow-keywords) {
+  :root { interpolate-size: allow-keywords; }
+  .live-nomination-details::details-content {
+    block-size: 0;
+    opacity: 0;
+    overflow: clip;
+    transition:
+      block-size 180ms ease-out,
+      opacity 160ms ease-out,
+      content-visibility 180ms allow-discrete;
+  }
+  .live-nomination-details[open]::details-content {
+    block-size: auto;
+    opacity: 1;
+  }
+}
+
+/* ==================================================================
+   Color semantic normalization (Live Draft Mode)
+   ------------------------------------------------------------------
+   One learnable system:
+     TEAL     (--link)    -- primary action / positive recommendation
+     RED      (--danger)  -- pass, overpay, materially negative state
+     AMBER    (--warning) -- caution, threshold, attention required
+     NEUTRAL  (--text /-muted) -- context, metadata, historical
+
+   Existing rules keep firing; these overrides retune only the spots
+   where the palette was doing something else (green for BUY, teal
+   for every clickable link, colored "elite" tier chip, etc.).
+   No structural or logic changes.
+   ================================================================== */
+
+/* --- Primary positive recommendation -> TEAL (was green success) --- */
+.live-nomination-rec.has-yourmax.is-buy {
+  border-color: color-mix(in srgb, var(--link) 50%, var(--border));
+  background: color-mix(in srgb, var(--link) 10%, transparent);
+}
+.live-nomination-rec.has-yourmax.is-buy .live-nomination-rec-headline {
+  color: var(--link);
+}
+.live-nomination-rec.has-yourmax.is-buy .live-nomination-rec-badge {
+  background: var(--link);
+  color: var(--card-bg);
+}
+.live-nomination-rec::before,
+.live-nomination-rec.has-yourmax.is-buy::before {
+  background: var(--link);
+}
+/* Pass + caution left rules already point at danger / warning above;
+   restated here defensively so the ::before selector's cascade order
+   can't leave them mid-swap. */
+.live-nomination-rec.is-pass::before,
+.live-nomination-rec.has-yourmax.is-pass::before {
+  background: var(--danger);
+}
+.live-nomination-rec.is-conditional::before,
+.live-nomination-rec.has-yourmax.is-caution::before {
+  background: var(--warning, #d97706);
+}
+
+/* Metric "room" chip in the On-the-Block card -- positive value now
+   speaks the same TEAL as the recommendation; negative stays RED. */
+.live-nomination-metric-value.is-positive { color: var(--link); }
+.live-nomination-metric-value.is-negative { color: var(--danger); }
+
+/* --- Tier badge -- neutral. Should NEVER compete with the rec. --- */
+.live-nomination-tier,
+.live-nomination-tier.is-elite {
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--card-bg) 60%, transparent);
+  border-color: var(--border);
+}
+
+/* --- Secondary links -> NEUTRAL (was teal because "interactive"). --- */
+.live-alternatives-see-all { color: var(--text-muted); }
+.live-alternatives-see-all:hover { color: var(--text); }
+
+/* --- "If you pass" alternatives labels that used to co-opt link
+   color -- neutralize so they read as metadata, not a CTA. --- */
+.live-alternatives-label-inline {
+  color: var(--text-muted);
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--card-bg) 60%, transparent);
+}
+
+/* --- Suggested-nomination badges -- align to semantic buckets:
+        Risky        -> RED
+        High pressure-> AMBER (existing)
+        Creates …    -> NEUTRAL (existing)
+        Strong target-> TEAL (was green success) --- */
+.live-suggester-badge.is-strong {
+  color: var(--link);
+  border-color: color-mix(in srgb, var(--link) 45%, var(--border));
+  background: color-mix(in srgb, var(--link) 8%, transparent);
+}
+
+/* --- Historical verdicts (past picks) -- OVERPAY is a materially
+   negative outcome, keep RED. BARGAIN is a positive historical
+   note, not an action: NEUTRAL, per "historical info -> neutral". --- */
+.live-pick-verdict.is-bargain,
+.live-nomination-verdict.is-bargain {
+  color: var(--text);
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--card-bg) 60%, transparent);
+  font-weight: 600;
+}
+
+/* --- Auction inflation summary -- contextual info, not an action.
+   Strip the tri-tone accent; the phrase itself communicates state.
+   The card's advice line still carries meaning without color noise. --- */
+.live-infl-summary,
+.live-infl-summary.is-positive,
+.live-infl-summary.is-negative { color: var(--text); }
+.live-infl-arrow.is-positive { color: var(--warning, #d97706); }
+.live-infl-arrow.is-negative { color: var(--text-muted); }
+
+/* --- LIVE status badge -- kept success-tinted (state indicator),
+   but tightened so it stays visually subordinate to the On-the-Block
+   recommendation. --- */
+.live-status-badge.is-live {
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 30%, transparent);
+  font-weight: 700;
+}
+
+/* --- Live Draft Mode header compaction ---
+   Kill the tall "Live Draft Mode" H2, tighten the crumb, and move
+   the status badge into the crumb so vertical chrome above the
+   On-the-Block card is minimal. */
+.mode-crumb-live {
+  margin-bottom: 10px;
+}
+.live-draft-heading { display: none; }
+.live-header {
+  margin-bottom: 10px;
+}
+.live-header-kicker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+.live-header-kicker .beta-badge {
+  font-size: 8.5px;
+  padding: 1px 5px;
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+  opacity: 0.85;
+}
+
+/* ==================================================================
+   Container flattening pass (On-the-Block card)
+   ------------------------------------------------------------------
+   Hierarchy from spacing + typography + one restrained accent, not
+   from stacking bordered boxes. The primary card keeps its border;
+   internal sections rely on dividers instead of their own frames.
+   ================================================================== */
+
+/* Primary card -- tone down the ambient shadow so it reads as one
+   surface, not a raised panel floating above the page. */
+.live-nomination-card {
+  box-shadow: var(--shadow-card, 0 1px 2px rgba(15, 23, 42, 0.04));
+}
+
+/* Recommendation block -- drop the tinted, bordered inner box. The
+   left accent bar (::before) + headline color still carry the
+   tri-state semantic without a nested container. */
+.live-nomination-rec.has-yourmax,
+.live-nomination-rec.has-yourmax.is-buy,
+.live-nomination-rec.has-yourmax.is-caution,
+.live-nomination-rec.has-yourmax.is-pass,
+.live-nomination-rec.is-pass,
+.live-nomination-rec.is-conditional {
+  border: none;
+  background: none;
+  border-radius: 0;
+}
+.live-nomination-rec.has-yourmax {
+  padding: 12px 0 12px 14px;
+  margin: 0 0 4px;
+  border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  border-radius: 0;
+}
+/* Left accent bar: keep as the tri-state signal, tightened. */
+.live-nomination-rec::before {
+  top: 12px;
+  bottom: 12px;
+}
+
+/* Player identity block sits above the recommendation with just
+   spacing -- no dedicated container. */
+.live-nomination-player {
+  margin-bottom: 4px;
+}
+
+/* ==================================================================
+   Accent reduction pass (Live Draft Mode)
+   ------------------------------------------------------------------
+   Reserve TEAL for the ONE thing the user must notice: the primary
+   recommendation. Everything else that used to grab teal because it
+   was "interactive" or "positive" drops to neutral.
+
+   After this pass, in a typical BUY state the only teal on screen is:
+     - the BID TO $X headline
+     - the 3px left accent bar on the recommendation
+     - the "Your bid" ownership badge (only when you're top bidder)
+   Everything else reads in neutral / success / danger / amber only
+   when the state actually earns the color.
+   ================================================================== */
+
+/* Secondary link buttons inside Live Mode -- back link, toggles,
+   "See all" -- render as muted text-links, never as teal CTAs.
+   Focus + hover still deepen the color so keyboard nav is legible. */
+#live-draft-view .link-btn {
+  color: var(--text-muted);
+}
+#live-draft-view .link-btn:hover,
+#live-draft-view .link-btn:focus-visible {
+  color: var(--text);
+}
+
+/* Room metric -- was teal, competing with the BID headline in the
+   same card. Positive value stays neutral (the sign + number carries
+   the meaning); a NEGATIVE room ("-$4") keeps RED because it's a
+   real problem: the current bid is over your recommended max. */
+.live-nomination-metric-value.is-positive {
+  color: var(--text);
+}
+
+/* Suggested nominations -- "Strong target" was teal. Now neutral, so
+   the ONLY colored chips in the list are the ones with real urgency:
+   HIGH PRESSURE (amber) and RISKY (red). "Strong target" and
+   "Creates pressure" both render as calm neutral chips. */
+.live-suggester-badge.is-strong,
+.live-suggester-badge.is-mid {
+  color: var(--text-muted);
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--card-bg) 60%, transparent);
+}
+
+/* Secondary card containers -- neutral surfaces. No tinted
+   accent borders on cards that aren't the primary recommendation. */
+#live-inflation-card,
+#live-suggester-card,
+#live-market-snapshot-card,
+#live-budgets-card,
+#live-picks-card {
+  border-color: var(--border);
+  background: var(--card-bg);
+  box-shadow: none;
+}
+
+/* ==================================================================
+   Recommendation prominence pass (On-the-Block)
+   ------------------------------------------------------------------
+   The BID TO $X line is the answer the manager is scanning for.
+   Give the amount extra weight, give the whole block breathing
+   room, and bump the supporting metrics just enough to stay
+   auction-legible without competing with the headline.
+   ================================================================== */
+
+.live-nomination-rec.has-yourmax {
+  padding: 18px 0 16px 16px;
+  margin: 6px 0 10px;
+}
+/* Verb ("BID TO", "BID UP TO", "PASS") -- slightly lighter than the
+   amount so the dollar figure carries the eye. */
+.live-nomination-rec-verb {
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  opacity: 0.92;
+}
+/* Amount ("$45") -- the scannable target. Slightly larger and
+   tighter than the verb; tabular numerals so digit widths don't
+   wobble as the recommendation ticks up. */
+.live-nomination-rec-amount {
+  font-size: 1.15em;
+  font-weight: 900;
+  letter-spacing: -0.015em;
+  font-variant-numeric: tabular-nums;
+}
+/* Restate headline sizing so the amount span composes cleanly on
+   top of the base rule. Wrapping is allowed -- on very narrow
+   viewports the amount cleanly drops to a second line rather than
+   clipping a 3-digit bid. */
+.live-nomination-rec.has-yourmax .live-nomination-rec-headline {
+  font-size: 40px;
+  line-height: 1.05;
+}
+
+/* Supporting metrics -- one small step up so Room / Fair Value /
+   Current Bid stay glance-legible next to a 40px headline. Still
+   clearly subordinate. */
+.live-nomination-metric-value {
+  font-size: 14px;
+  font-weight: 700;
+}
+.live-nomination-metric-label {
+  font-size: 10px;
+}
+.live-nomination-metrics {
+  margin-top: 14px;
+  padding-top: 12px;
+}
+
+/* Reason line under the metrics -- a little more air so it reads
+   as its own tier, not a continuation of the metric grid. */
+.live-nomination-rec-reason-line {
+  margin: 12px 0 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+/* State-aware sub-status line -- surfaces only for CAUTION and PASS
+   and carries the "how close to the ceiling / why stop" beat in
+   plain language. Color follows the tri-state, but the copy alone
+   already communicates the recommendation (req 6). */
+.live-nomination-rec-substatus {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.live-nomination-rec.has-yourmax.is-caution .live-nomination-rec-substatus {
+  color: var(--warning, #d97706);
+}
+.live-nomination-rec.has-yourmax.is-pass .live-nomination-rec-substatus {
+  color: var(--danger);
+}
+
+/* ==================================================================
+   PROTOTYPE -- Price visualization variant of On-the-Block card
+   ------------------------------------------------------------------
+   This is a scoped A/B prototype. It reuses production tokens and
+   the existing recommendation classes so the header treatment is
+   IDENTICAL to the production card; only the meter is new. Do not
+   generalize these styles to other cards.
+   ================================================================== */
+/* Card shell -- this WAS the A/B prototype's dashed border. Now that
+   the price-visualization card is the live On-the-Block card, it
+   inherits the standard .card treatment; no overrides needed. */
+.live-prototype-card {
+  /* intentionally empty -- inherits from .card */
+}
+/* Legacy "PROTOTYPE" tag styling is retained (harmless) so any stray
+   markup elsewhere still renders correctly if it exists. The tag was
+   removed from the on-the-block card in the HTML. */
+.live-prototype-tag {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+/* Reason line moves to sit directly under the headline in the
+   prototype; drop the metrics-grid margin bump. */
+.live-prototype-reason {
+  margin: 6px 0 0;
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* --- Price meter --------------------------------------------------
+   Zones are absolute stripes inside the track, sized off CSS custom
+   properties. Markers absolute-position via the same domain. Labels
+   read via aria-label on the track. */
+.live-prototype-meter {
+  margin-top: 14px;
+}
+/* Four-column grid: each zone kicker owns exactly 25% of the width,
+   permanently. Zones never resize based on player data. */
+.live-prototype-meter-labels {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  margin-bottom: 6px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.live-prototype-zone-label {
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.live-prototype-zone-label.is-great     { color: var(--success); }
+.live-prototype-zone-label.is-good      { color: var(--text-muted); }
+.live-prototype-zone-label.is-fairprice { color: var(--warning, #d97706); }
+.live-prototype-zone-label.is-poor      { color: var(--danger); }
+
+.live-prototype-track {
+  position: relative;
+  height: 12px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  overflow: visible;
+}
+.live-prototype-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 25%;
+}
+/* Zone fills read left -> right as "more value / less value".
+   Left-most (GREAT) gets the strongest positive wash; each step
+   right the wash shifts toward danger. Restrained saturations
+   throughout so the current-bid dot stays the eye's target. */
+.live-prototype-zone-value {   /* GREAT */
+  left: 0;
+  background: color-mix(in srgb, var(--success) 32%, transparent);
+  border-top-left-radius: 6px;
+  border-bottom-left-radius: 6px;
+}
+.live-prototype-zone-fair {    /* GOOD */
+  left: 25%;
+  background: color-mix(in srgb, var(--success) 18%, transparent);
+}
+.live-prototype-zone-stretch { /* FAIR (price) */
+  left: 50%;
+  background: color-mix(in srgb, var(--warning, #d97706) 20%, transparent);
+}
+.live-prototype-zone-toohigh { /* POOR */
+  left: 75%;
+  background: color-mix(in srgb, var(--danger) 26%, transparent);
+  border-top-right-radius: 6px;
+  border-bottom-right-radius: 6px;
+}
+
+/* Max-bid marker: vertical tick that sits at the boundary of
+   Stretch/Too high. Small and subordinate to the current-bid dot. */
+.live-prototype-max {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  left: var(--max-pos, 75%);
+  width: 2px;
+  background: var(--text);
+  transform: translateX(-1px);
+  border-radius: 1px;
+  opacity: 0.85;
+}
+
+/* Current-bid marker: solid dot that reads as THE dynamic element.
+   Tone follows the zone (data-current-zone on the track). */
+.live-prototype-current {
+  position: absolute;
+  top: 50%;
+  left: var(--current-pos, 0%);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text);
+  border: 2px solid var(--card-bg);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 30%, transparent);
+}
+/* zone data attribute names match the underlying meter geometry
+   (value=below fair, fair=in range, stretch=above fair under max,
+   toohigh=above max). Display labels are Great/Good/Fair/Poor. */
+.live-prototype-track[data-current-zone="value"]    .live-prototype-current { background: var(--success); }
+.live-prototype-track[data-current-zone="fair"]     .live-prototype-current { background: var(--success); }
+.live-prototype-track[data-current-zone="stretch"]  .live-prototype-current { background: var(--warning, #d97706); }
+.live-prototype-track[data-current-zone="toohigh"]  .live-prototype-current { background: var(--danger); }
+
+/* Marker labels sit below the track. Fair range + Max label share
+   row 1; Current dot label owns row 2 (prominent) so the two never
+   collide when their positions get close. */
+.live-prototype-marker-labels {
+  position: relative;
+  margin-top: 8px;
+  height: 32px;
+  font-variant-numeric: tabular-nums;
+}
+.live-prototype-threshold,
+.live-prototype-label-current {
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+/* Three threshold annotations sit at the internal zone boundaries:
+   $fvLow at 25%, $fvHigh at 50%, $yourMax at 75%. Fixed positions,
+   dynamic dollar values. */
+.live-prototype-threshold {
+  top: 0;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.live-prototype-threshold-low  { left: 25%; }
+.live-prototype-threshold-high { left: 50%; }
+.live-prototype-threshold-max  { left: 75%; }
+.live-prototype-label-current {
+  left: var(--label-pos, 0%);
+}
+.live-prototype-label-current {
+  top: 16px;
+  font-size: 11px;
+  color: var(--text);
+  font-weight: 700;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  line-height: 1.15;
+}
+.live-prototype-label-current[data-zone="stretch"] { color: var(--warning, #d97706); }
+.live-prototype-label-current[data-zone="toohigh"] { color: var(--danger); }
+.live-prototype-label-kicker {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.live-prototype-label-current .live-prototype-label-kicker {
+  color: inherit;
+  opacity: 0.7;
+}
+
+.live-prototype-footnote {
+  margin: 14px 0 0;
+  font-size: 10.5px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ==================================================================
+   Keyboard focus indicators
+   ------------------------------------------------------------------
+   Consistent :focus-visible treatment for interactive controls that
+   were previously relying on the browser default or had no visible
+   focus at all. Uses --input-focus (teal in both themes) so the ring
+   matches the input focus treatment set on inputs above.
+
+   Only :focus-visible is used, so mouse clicks do not paint a ring.
+   Existing custom focus rules (card-title-toggle, next-nom-tab,
+   live-first-run-tip-dismiss, live-infl-chip, #live-draft-view
+   .link-btn) are intentionally left alone.
+   ================================================================== */
+.btn:focus-visible,
+.icon-btn:focus-visible,
+.link-btn:focus-visible,
+.settings-btn:focus-visible,
+.settings-menu-item:focus-visible,
+.avail-chip:focus-visible,
+.avail-page-btn:focus-visible,
+.next-nom-action:focus-visible,
+.next-nom-avoid-toggle:focus-visible,
+.live-alternatives-see-all:focus-visible,
+.live-market-snapshot-toggle:focus-visible,
+.live-suggester-refresh:focus-visible,
+.live-scarcity-info-btn:focus-visible {
+  outline: 2px solid var(--input-focus);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Native <select> keeps its own ring shape; give it the same accent. */
+.avail-sort-select:focus-visible {
+  outline: 2px solid var(--input-focus);
+  outline-offset: 2px;
+}
+
+/* ==================================================================
+   Reduced motion
+   ------------------------------------------------------------------
+   Users who opt into reduced motion get an instantaneous UI: the
+   spin/pulse/flash loops are cut, chevron and details transitions
+   collapse to immediate state changes, and the details expand/
+   collapse animation is bypassed. Functional state (spinner appears,
+   flash is visible, chevron rotates) is preserved -- only the
+   animated interpolation between states is removed.
+   ================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  /* Spinner: freeze at rest instead of rotating. */
+  .resync-btn.is-spinning svg { animation: none; }
+
+  /* Live pulse: solid dot, no throb. */
+  .live-poll-indicator { animation: none; }
+
+  /* New-pick flash: show the highlight briefly then clear, no fade. */
+  .live-pick-log li.is-new::before {
+    animation: none;
+    opacity: 0;
+  }
+
+  /* Details expand/collapse: skip the height/opacity interpolation. */
+  .live-nomination-details::details-content,
+  .live-nomination-details[open]::details-content {
+    transition: none;
+  }
 }
 

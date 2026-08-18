@@ -138,12 +138,10 @@
          only one is visible at a time. Internal sections below are
          mutually exclusive states of the same session lifecycle. -->
     <section id="live-draft-view" hidden>
-      <div class="mode-crumb">
-        <button id="back-to-analysis-btn" class="link-btn" type="button">← Back to pre-draft analysis</button>
-        <span class="beta-badge beta-badge-lg">beta</span>
+      <div class="mode-crumb mode-crumb-live">
+        <button id="back-to-analysis-btn" class="link-btn" type="button">← Pre-draft</button>
+        <span class="live-status-badge" id="live-status-badge"></span>
       </div>
-
-      <h2 class="live-draft-heading">Live Draft Mode</h2>
 
       <!-- No draft detected in the active tab AND user needs to pick one. -->
       <section id="live-no-draft" class="card" hidden>
@@ -183,7 +181,7 @@
           </div>
           <div class="live-first-run-tip-body">
             <strong>Load your player pool for accurate tiers.</strong>
-            Tap "Load full player pool" in the Suggested nominations card below. This snapshots your league's current-year projections so Draft Pilot can rank each nomination against real positional depth.
+            Tap "Load full player pool" in the Next nomination card below. This snapshots your league's current-year projections so Draft Pilot can score every nomination against real positional depth.
           </div>
           <button id="live-first-run-tip-dismiss" class="live-first-run-tip-dismiss" type="button" aria-label="Dismiss tip">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -195,10 +193,13 @@
 
         <div class="live-header">
           <div class="live-header-info">
+            <div class="live-header-kicker">
+              <span>Live Draft</span>
+              <span class="beta-badge">beta</span>
+            </div>
             <div class="live-league-name" id="live-league-name"></div>
             <div class="live-format-line" id="live-format-line"></div>
           </div>
-          <div class="live-status-badge" id="live-status-badge"></div>
         </div>
 
         <section id="live-snake-notice" class="card card-placeholder" hidden>
@@ -227,9 +228,9 @@
              methodology) lives inside the Details panel — never in
              the default view. -->
         <section id="live-nomination-card" class="card live-nomination-card" hidden>
-          <div class="live-nomination-status-row">
-            <span id="live-nomination-status" class="live-nomination-status"></span>
-          </div>
+          <!-- Draft status (LIVE / PAUSED) is already surfaced near the
+               Live Draft Mode header; showing it a second time inside
+               On the Block was redundant. -->
           <div class="live-nomination-player">
             <div class="live-nomination-name" id="live-nomination-name"></div>
             <div class="live-nomination-meta">
@@ -239,9 +240,32 @@
             <div id="live-nomination-nominator" class="live-nomination-nominator" hidden></div>
           </div>
 
-          <!-- Tier 1 — Decision. -->
+          <!-- Tier 1 — Decision. Headline + short reason + a
+               3-column mini-grid summarising fair value, current bid,
+               and remaining room. The metrics grid replaces the older
+               prose "Fair $X · Bid $Y · $Z room" line for the bidEngine
+               path; the prose range is retained (hidden) for the legacy
+               non-bidEngine fallback. -->
           <div id="live-nomination-rec" class="live-nomination-rec" hidden>
-            <div class="live-nomination-rec-headline" id="live-nomination-rec-headline">—</div>
+            <div class="live-nomination-rec-head">
+              <div class="live-nomination-rec-headline" id="live-nomination-rec-headline">—</div>
+              <span id="live-nomination-rec-badge" class="live-nomination-rec-badge" hidden>Your bid</span>
+            </div>
+            <div id="live-nomination-rec-metrics" class="live-nomination-metrics" hidden>
+              <div class="live-nomination-metric">
+                <span class="live-nomination-metric-label">Fair Value</span>
+                <span class="live-nomination-metric-value" id="live-nomination-metric-fair">—</span>
+              </div>
+              <div class="live-nomination-metric">
+                <span class="live-nomination-metric-label">Current Bid</span>
+                <span class="live-nomination-metric-value" id="live-nomination-metric-bid">—</span>
+              </div>
+              <div class="live-nomination-metric">
+                <span class="live-nomination-metric-label">Room</span>
+                <span class="live-nomination-metric-value" id="live-nomination-metric-room">—</span>
+              </div>
+            </div>
+            <p id="live-nomination-rec-reason" class="live-nomination-rec-reason-line" hidden></p>
             <div class="live-nomination-rec-range" id="live-nomination-rec-range" hidden></div>
           </div>
 
@@ -255,8 +279,15 @@
           </div>
 
           <!-- Tier 3 — Competition. One composed sentence combining
-               the summary and biggest-threat callout. -->
+               the summary and biggest-threat callout. Rendered as an
+               elevated sub-card with a warning icon so it reads as a
+               distinct "watch out" beat, not just another line of copy. -->
           <div id="live-competition" class="live-competition" hidden>
+            <svg class="live-competition-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
             <span id="live-competition-text" class="live-competition-text"></span>
           </div>
 
@@ -264,7 +295,19 @@
                revealed inside the Details panel below. -->
           <div id="live-nomination-alternatives" class="live-alternatives" hidden>
             <div class="live-alternatives-header">
-              <span class="live-alternatives-label">Alternatives</span>
+              <span class="live-alternatives-label">If you pass</span>
+              <button
+                type="button"
+                id="live-alternatives-see-all"
+                class="link-btn live-alternatives-see-all"
+                hidden
+              >
+                <span id="live-alternatives-see-all-text">See all</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                  <polyline points="12 5 19 12 12 19"/>
+                </svg>
+              </button>
             </div>
             <ul id="live-alternatives-list" class="live-alternatives-list"></ul>
             <div id="live-alternatives-empty" class="live-alternatives-empty" hidden>
@@ -277,7 +320,12 @@
                remaining alternatives, competitor breakdown, per-lift
                dollar contributions, and methodology. -->
           <details id="live-nomination-details" class="live-nomination-details" hidden>
-            <summary id="live-nomination-details-summary">Details</summary>
+            <summary id="live-nomination-details-summary" class="live-nomination-details-summary">
+              <span id="live-nomination-details-summary-text">Why this recommendation?</span>
+              <svg class="live-nomination-details-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </summary>
             <div id="live-details-body" class="live-details-body"></div>
             <p class="live-nomination-details-caveat">
               This is a recommendation, not a guaranteed clearing price. Trust the room and your feel for the auction.
@@ -330,14 +378,212 @@
           </p>
         </section>
 
-<!-- Auction inflation panel. Surfaces the live inflation factor
-             (already computed for the nomination card) as a first-class
-             signal — factor, trend, sparkline, and the $-remaining vs
-             $-expected breakdown that drives the number. Auction-only. -->
-        <!-- Auction inflation — compact ambient chip. The chip itself
-             is the toggle; expanded body reveals interpretation, advice,
-             and supporting math. Collapsed by default so it stays
-             ambient during a live nomination. -->
+        <!-- ============================================================
+             PROTOTYPE -- Price visualization variant of the On-the-Block
+             card. Renders BELOW the production card so the two can be
+             compared side-by-side using the same live draft data. Does
+             not touch the production render path; reads the exact same
+             rec + nom objects.
+             ============================================================ -->
+        <section id="live-nomination-prototype-card" class="card live-prototype-card" hidden>
+          <!-- 1. Player identity (name, meta chip, tier badge, nominator) -->
+          <div class="live-nomination-player">
+            <div class="live-nomination-name" id="live-prototype-name"></div>
+            <div class="live-nomination-meta">
+              <span id="live-prototype-meta"></span>
+              <span id="live-prototype-tier" class="live-nomination-tier" hidden></span>
+            </div>
+            <div id="live-prototype-nominator" class="live-nomination-nominator" hidden></div>
+          </div>
+
+          <!-- 2. Primary recommendation (BID TO $X + roster reason) -->
+          <div id="live-prototype-rec" class="live-nomination-rec has-yourmax">
+            <div class="live-nomination-rec-head">
+              <div class="live-nomination-rec-headline" id="live-prototype-headline">—</div>
+            </div>
+            <p id="live-prototype-substatus" class="live-nomination-rec-substatus" hidden></p>
+            <p id="live-prototype-reason" class="live-nomination-rec-reason-line live-prototype-reason" hidden></p>
+          </div>
+
+          <!-- 3. Roster / market context sentence (mirrored from production) -->
+          <div id="live-prototype-context" class="live-context" hidden>
+            <span id="live-prototype-context-text" class="live-context-text"></span>
+          </div>
+
+          <!-- 4. Competition / biggest-threat sentence (mirrored) -->
+          <div id="live-prototype-competition" class="live-competition" hidden>
+            <svg class="live-competition-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <span id="live-prototype-competition-text" class="live-competition-text"></span>
+          </div>
+
+          <!-- 5. Price visualization -->
+          <div id="live-prototype-meter" class="live-prototype-meter" hidden>
+            <div class="live-prototype-meter-labels" aria-hidden="true">
+              <span class="live-prototype-zone-label is-great">Great</span>
+              <span class="live-prototype-zone-label is-good">Good</span>
+              <span class="live-prototype-zone-label is-fairprice">Fair</span>
+              <span class="live-prototype-zone-label is-poor">Poor</span>
+            </div>
+            <div class="live-prototype-track" role="img" id="live-prototype-track" aria-label="Price meter">
+              <span class="live-prototype-zone live-prototype-zone-value"></span>
+              <span class="live-prototype-zone live-prototype-zone-fair"></span>
+              <span class="live-prototype-zone live-prototype-zone-stretch"></span>
+              <span class="live-prototype-zone live-prototype-zone-toohigh"></span>
+              <span class="live-prototype-max" id="live-prototype-max-marker" title="Max bid"></span>
+              <span class="live-prototype-current" id="live-prototype-current-marker"></span>
+            </div>
+            <div class="live-prototype-marker-labels">
+              <span class="live-prototype-threshold live-prototype-threshold-low" id="live-prototype-threshold-low"></span>
+              <span class="live-prototype-threshold live-prototype-threshold-high" id="live-prototype-threshold-high"></span>
+              <span class="live-prototype-threshold live-prototype-threshold-max" id="live-prototype-threshold-max"></span>
+              <span class="live-prototype-label-current" id="live-prototype-label-current"></span>
+            </div>
+          </div>
+
+          <!-- 6. IF YOU PASS (alternatives, cloned from production) -->
+          <div id="live-prototype-alternatives-mount"></div>
+
+          <!-- 7. Why this recommendation? (expandable, cloned from production) -->
+          <div id="live-prototype-details-mount"></div>
+        </section>
+
+<!-- Next Nomination — strategy recommendation card (Phase 1–2
+             redesign of the old suggester). Requires a full player-pool
+             snapshot captured by the content script (via scroll +
+             collect on the Sleeper draft board). The snapshot is
+             opportunistically cached by "Export My Draft Room" so an
+             early exporter gets the suggester "for free"; otherwise a
+             load button here triggers the capture. -->
+        <section id="live-suggester-card" class="card next-nom-card" hidden>
+          <button
+            class="card-title card-title-toggle"
+            id="live-suggester-toggle"
+            type="button"
+            aria-expanded="true"
+            aria-controls="live-suggester-body"
+          >
+            <span>Next nomination</span>
+            <svg class="card-toggle-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
+          <div id="live-suggester-body" class="card-collapsible-body">
+            <p id="live-suggester-hint" class="card-body" hidden>
+              Load your league's player pool so Draft Pilot can recommend a strategic nomination.
+            </p>
+
+            <div id="next-nom-strategy-bar" class="next-nom-strategy-bar" role="tablist" aria-label="Nomination strategy" hidden>
+              <button type="button" role="tab" class="next-nom-tab" data-strategy="DRAIN" aria-selected="false" tabindex="-1">Drain</button>
+              <button type="button" role="tab" class="next-nom-tab" data-strategy="DISTRACT" aria-selected="false" tabindex="-1">Distract</button>
+              <button type="button" role="tab" class="next-nom-tab" data-strategy="TARGET" aria-selected="false" tabindex="-1">Target</button>
+            </div>
+            <div id="next-nom-recommends" class="next-nom-recommends" hidden>
+              Draft Pilot recommends: <span id="next-nom-recommends-value"></span>
+            </div>
+
+            <div id="next-nom-primary" class="next-nom-primary" hidden>
+              <div class="next-nom-strategy" id="next-nom-strategy"></div>
+              <div class="next-nom-player">
+                <div class="next-nom-name" id="next-nom-name"></div>
+                <div class="next-nom-meta" id="next-nom-meta"></div>
+              </div>
+              <div class="next-nom-value-row">
+                <div class="next-nom-value" id="next-nom-value"></div>
+                <span class="next-nom-market" id="next-nom-market" hidden></span>
+              </div>
+              <p class="next-nom-reason" id="next-nom-reason"></p>
+              <div class="next-nom-bidders" id="next-nom-bidders" hidden>
+                <div class="next-nom-bidders-label">Likely bidders</div>
+                <ul class="next-nom-bidders-list" id="next-nom-bidders-list"></ul>
+              </div>
+              <button type="button" id="next-nom-action" class="next-nom-action">Nominate</button>
+            </div>
+
+            <div id="next-nom-others" class="next-nom-others" hidden>
+              <div class="next-nom-others-label">Other options</div>
+              <ul id="next-nom-others-list" class="next-nom-others-list"></ul>
+            </div>
+
+            <div id="next-nom-empty" class="next-nom-empty" hidden>
+              <div class="next-nom-strategy is-wait">No clear nomination</div>
+              <p class="next-nom-reason">Hold off until the next player changes the room.</p>
+            </div>
+
+            <button
+              type="button"
+              id="next-nom-avoid-toggle"
+              class="next-nom-avoid-toggle link-btn"
+              hidden
+            >Show players to avoid</button>
+
+            <p id="live-suggester-status" class="status" role="status"></p>
+            <div class="live-suggester-footer">
+              <p id="live-suggester-footnote" class="live-suggester-footnote" hidden></p>
+              <button id="live-suggester-load-btn" class="link-btn live-suggester-refresh" type="button">
+                Refresh player pool
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Available Players — live auction market. Complementary to
+             Next Nomination: this is exploratory. Only meaningful once
+             the player-pool snapshot has been captured. -->
+        <section id="live-available-card" class="card" hidden>
+          <button
+            class="card-title card-title-toggle"
+            id="live-available-toggle"
+            type="button"
+            aria-expanded="true"
+            aria-controls="live-available-body"
+          >
+            <span>Available players</span>
+            <svg class="card-toggle-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
+          <div id="live-available-body" class="card-collapsible-body">
+            <div class="avail-summary" id="avail-summary" hidden></div>
+            <div class="avail-controls">
+              <input
+                type="search"
+                id="avail-search"
+                class="avail-search"
+                placeholder="Search name or team…"
+                aria-label="Search available players"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <div class="avail-position-chips" id="avail-position-chips" role="tablist" aria-label="Position filter"></div>
+              <label class="avail-sort">
+                <span class="avail-sort-label">Sort</span>
+                <select id="avail-sort" class="avail-sort-select">
+                  <option value="value">Live value</option>
+                  <option value="marketUp">Biggest market increase</option>
+                  <option value="marketDown">Biggest market decrease</option>
+                  <option value="tier">Tier</option>
+                  <option value="position">Position</option>
+                </select>
+              </label>
+            </div>
+            <ul id="avail-list" class="avail-list"></ul>
+            <p id="avail-empty" class="avail-empty" hidden>No players found. Try another search or filter.</p>
+            <div id="avail-pagination" class="avail-pagination" hidden>
+              <button type="button" id="avail-prev" class="avail-page-btn" aria-label="Previous page">Prev</button>
+              <span id="avail-page-status" class="avail-page-status"></span>
+              <button type="button" id="avail-next" class="avail-page-btn" aria-label="Next page">Next</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Auction temperature — live inflation factor. Compact
+             ambient chip; the chip itself is the toggle. Collapsed by
+             default so it stays out of the way while the manager is
+             deciding on a nomination. -->
         <section id="live-inflation-card" class="card card-compact" hidden>
           <button
             class="live-infl-chip card-title-toggle"
@@ -346,28 +592,30 @@
             aria-expanded="false"
             aria-controls="live-inflation-body"
           >
-            <span class="live-infl-chip-label">Inflation</span>
-            <span class="live-infl-factor" id="live-infl-factor">—</span>
-            <span class="live-infl-word" id="live-infl-word"></span>
+            <span class="live-infl-heading">
+              <span class="live-infl-chip-label">Auction temperature</span>
+              <span class="live-infl-summary" id="live-infl-summary">—</span>
+            </span>
             <span class="live-infl-arrow" id="live-infl-arrow" hidden></span>
             <svg class="card-toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <polyline points="6 9 12 15 18 9"/>
             </svg>
+            <span class="live-infl-factor" id="live-infl-factor" hidden></span>
+            <span class="live-infl-word" id="live-infl-word" hidden></span>
+            <span class="live-infl-interp" id="live-infl-interp" hidden></span>
           </button>
           <div id="live-inflation-body" class="card-collapsible-body" hidden>
-            <p class="live-infl-interp" id="live-infl-interp">—</p>
-            <p class="live-infl-advice" id="live-infl-advice"></p>
             <p class="live-infl-support" id="live-infl-support"></p>
+            <p class="live-infl-advice" id="live-infl-advice"></p>
+            <p class="live-infl-freshness" id="live-infl-freshness"></p>
           </div>
         </section>
 
-        <!-- Positional Market Snapshot. One row per position summarizing
-             league-wide market pressure. Sorted by pressure desc so the
-             hottest positions surface first. Reads the same scarcity
-             engine as the On-the-Block card; numbers always agree. -->
-        <!-- Positional Market. During an active nomination only the
-             nominated position's row is shown by default; the full
-             board is revealed via "See positional market". -->
+        <!-- Positional Market Pressure. One row per position summarizing
+             league-wide market pressure; reads the same scarcity engine
+             as the On-the-Block card so numbers always agree. During an
+             active nomination only the nominated position's row is shown
+             by default; the full board is revealed via the toggle. -->
         <section id="live-market-snapshot-card" class="card card-compact" hidden>
           <div id="live-market-snapshot-body" class="live-market-snapshot-body"></div>
           <button
@@ -378,10 +626,33 @@
           >See positional market</button>
         </section>
 
-        <!-- Draft performance scorecard. Aggregates the user's own picks
-             into a value + composition summary. Hidden until a pool is
-             loaded (verdicts require projections) and until the user
-             has drafted at least one player. -->
+        <!-- Recent activity — post-hoc log, not a decision surface;
+             collapsed by default to stay out of the way while the
+             manager is deciding on a nomination. -->
+        <section id="live-pick-log-card" class="card" hidden>
+          <button
+            class="card-title card-title-toggle"
+            id="live-picks-toggle"
+            type="button"
+            aria-expanded="false"
+            aria-controls="live-picks-body"
+          >
+            <span>Recent activity</span>
+            <svg class="card-toggle-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
+          <div id="live-picks-body" class="card-collapsible-body" hidden>
+            <p id="live-pick-empty" class="card-body">No picks completed yet.</p>
+            <ul id="live-pick-log" class="live-pick-log"></ul>
+            <p id="live-last-updated" class="live-last-updated"></p>
+          </div>
+        </section>
+
+        <!-- Draft performance scorecard. Hidden in-draft today; kept in
+             the DOM so its render path (and message wiring) stays live
+             for the moment the layout lands. Positioned after the
+             primary decision flow so it never competes visually. -->
         <section id="live-your-team-card" class="card" hidden>
           <button
             class="card-title card-title-toggle"
@@ -417,40 +688,9 @@
           </div>
         </section>
 
-        <!-- Nomination suggester. Requires a full player-pool snapshot
-             captured by the content script (via scroll + collect on
-             the Sleeper draft board). The snapshot is opportunistically
-             cached by "Export My Draft Room" so an early exporter gets
-             the suggester "for free"; otherwise a load button here
-             triggers the capture. -->
-        <section id="live-suggester-card" class="card" hidden>
-          <button
-            class="card-title card-title-toggle"
-            id="live-suggester-toggle"
-            type="button"
-            aria-expanded="true"
-            aria-controls="live-suggester-body"
-          >
-            <span>Suggested nominations</span>
-            <svg class="card-toggle-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <polyline points="6 9 12 15 18 9"/>
-            </svg>
-          </button>
-          <div id="live-suggester-body" class="card-collapsible-body">
-            <p id="live-suggester-hint" class="card-body">
-              Nominate players your opponents need — force them to burn cap before you take a run at your targets.
-            </p>
-            <button id="live-suggester-load-btn" class="btn btn-secondary btn-tiny" type="button">
-              Load full player pool
-            </button>
-            <p id="live-suggester-status" class="status" role="status"></p>
-            <ul id="live-suggester-list" class="live-suggester-list"></ul>
-            <p id="live-suggester-footnote" class="live-suggester-footnote" hidden></p>
-          </div>
-        </section>
-
         <!-- Per-team budgets (auction only). Populated from the same
-             message stream as the nomination card. -->
+             message stream as the nomination card. Hidden today; kept
+             in the DOM for the same reason as the scorecard above. -->
         <section id="live-budgets-card" class="card" hidden>
           <button
             class="card-title card-title-toggle"
@@ -483,28 +723,6 @@
           </div>
         </section>
 
-        <!-- Recent activity — collapsed by default. Post-hoc log,
-             not a decision surface; keep it available but out of the
-             way while the manager is deciding on a nomination. -->
-        <section id="live-pick-log-card" class="card" hidden>
-          <button
-            class="card-title card-title-toggle"
-            id="live-picks-toggle"
-            type="button"
-            aria-expanded="false"
-            aria-controls="live-picks-body"
-          >
-            <span>Recent activity</span>
-            <svg class="card-toggle-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <polyline points="6 9 12 15 18 9"/>
-            </svg>
-          </button>
-          <div id="live-picks-body" class="card-collapsible-body" hidden>
-            <p id="live-pick-empty" class="card-body">No picks completed yet.</p>
-            <ul id="live-pick-log" class="live-pick-log"></ul>
-            <p id="live-last-updated" class="live-last-updated"></p>
-          </div>
-        </section>
       </section>
 
       <!-- Escape-hatch export. Demoted from a primary-styled card to

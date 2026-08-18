@@ -38,6 +38,28 @@
   // Small helpers
   // ---------------------------------------------------------------------
   function num(v, dflt) { const n = Number(v); return Number.isFinite(n) ? n : (dflt == null ? 0 : dflt); }
+
+  // Coerce a caller-supplied fair-value range into {low, center, high}
+  // with integer dollars and the low <= center <= high invariant.
+  // When absent OR malformed, synthesize a single-point range from the
+  // scalar so downstream (UI + breakdown) always has a range object.
+  function normalizeRange(range, scalarCenter) {
+    const c = Math.max(1, Math.round(num(scalarCenter, 0)));
+    if (!range || typeof range !== 'object') return { low: c, center: c, high: c };
+    let low = Math.max(1, Math.round(num(range.low, c)));
+    let high = Math.max(low, Math.round(num(range.high, c)));
+    let center = Math.max(1, Math.round(num(range.center, c)));
+    if (low > center) low = center;
+    if (high < center) high = center;
+    return { low, center, high };
+  }
+
+  // Format a range for UI. Collapses to a single number when
+  // low == high (typically the scalar-only fallback path).
+  function formatRange(r) {
+    if (!r) return '';
+    return r.low === r.high ? `$${r.center}` : `$${r.low}–${r.high}`;
+  }
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
   function round(v) { return Math.max(1, Math.round(v)); }
   function upper(s) { return String(s == null ? '' : s).toUpperCase(); }
@@ -325,6 +347,10 @@
     const o = opts || {};
     const nom = o.nom || null;
     const fairValue = num(o.fairValue, 0);
+    // Fair Value RANGE. When absent, callers get a single-point range
+    // synthesized from the scalar (low==center==high) so downstream
+    // code and the UI always have a range to render.
+    const fairValueRange = normalizeRange(o.fairValueRange, fairValue);
     const currentBid = Math.max(0, Math.floor(num(o.currentBid, 0)));
     const you = o.you || null;
     const teams = o.teams || [];
@@ -471,7 +497,7 @@
     // 14. Breakdown -- for the "Why?" details panel. Presented as
     //     dollar-terms rather than raw percentages.
     const breakdown = buildBreakdown({
-      fairValue, rosterLiftPct, scarcityLiftPct, replacementLiftPct,
+      fairValue, fairValueRange, rosterLiftPct, scarcityLiftPct, replacementLiftPct,
       competitionLiftPct, opportunityCutPct, yourMax, currentBid,
       remainingBudget, requiredFuture, openSlots, comp, needTone,
       level, rd, pressureTone,
@@ -479,6 +505,7 @@
 
     return {
       fairValue,
+      fairValueRange,
       recommendedMax: yourMax,
       currentBid,
       remainingValue: decision.remainingValue,
@@ -585,7 +612,9 @@
   function buildBreakdown(x) {
     const rows = [];
     const dollarPct = (p) => Math.round(x.fairValue * p);
-    rows.push(['Fair value', `$${x.fairValue}`]);
+    // Fair value row shows the RANGE. Falls back to the scalar when
+    // the range collapsed to a point (missing tierAggregates path).
+    rows.push(['Fair value', formatRange(x.fairValueRange)]);
     rows.push(['Roster need', labelForNeed(x.needTone)]);
     if (x.rosterLiftPct) rows.push(['Roster adj', signed(dollarPct(x.rosterLiftPct))]);
     if (x.level) rows.push(['Scarcity', String(x.level)]);

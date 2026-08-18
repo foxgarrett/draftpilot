@@ -44,7 +44,10 @@
 
   // Live nomination + team budgets (fed by content/liveObserver.js).
   const liveNominationCard = document.getElementById('live-nomination-card');
-  const liveNominationStatus = document.getElementById('live-nomination-status');
+  // Draft status pill was removed from the On the Block card (it's already
+  // shown near the Live Draft Mode header). The variable stays as null so
+  // any lingering guarded reads no-op instead of throwing.
+  const liveNominationStatus = null;
   const liveNominationName = document.getElementById('live-nomination-name');
   const liveNominationMeta = document.getElementById('live-nomination-meta');
   const liveNominationTier = document.getElementById('live-nomination-tier');
@@ -155,13 +158,35 @@
   const liveInflWord = document.getElementById('live-infl-word');
   const liveInflArrow = document.getElementById('live-infl-arrow');
   const liveInflInterp = document.getElementById('live-infl-interp');
+  const liveInflSummary = document.getElementById('live-infl-summary');
   const liveInflAdvice = document.getElementById('live-infl-advice');
   const liveInflSupport = document.getElementById('live-infl-support');
+  const liveInflFreshness = document.getElementById('live-infl-freshness');
   const liveSuggesterCard = document.getElementById('live-suggester-card');
   const liveSuggesterLoadBtn = document.getElementById('live-suggester-load-btn');
   const liveSuggesterStatus = document.getElementById('live-suggester-status');
-  const liveSuggesterList = document.getElementById('live-suggester-list');
+  const liveSuggesterHint = document.getElementById('live-suggester-hint');
   const liveSuggesterFootnote = document.getElementById('live-suggester-footnote');
+  const nextNomStrategyBar = document.getElementById('next-nom-strategy-bar');
+  const nextNomTabs = nextNomStrategyBar
+    ? Array.from(nextNomStrategyBar.querySelectorAll('.next-nom-tab'))
+    : [];
+  const nextNomRecommends = document.getElementById('next-nom-recommends');
+  const nextNomRecommendsValue = document.getElementById('next-nom-recommends-value');
+  const nextNomAvoidToggle = document.getElementById('next-nom-avoid-toggle');
+  const nextNomPrimary = document.getElementById('next-nom-primary');
+  const nextNomStrategy = document.getElementById('next-nom-strategy');
+  const nextNomName = document.getElementById('next-nom-name');
+  const nextNomMeta = document.getElementById('next-nom-meta');
+  const nextNomValue = document.getElementById('next-nom-value');
+  const nextNomMarket = document.getElementById('next-nom-market');
+  const nextNomBidders = document.getElementById('next-nom-bidders');
+  const nextNomBiddersList = document.getElementById('next-nom-bidders-list');
+  const nextNomReason = document.getElementById('next-nom-reason');
+  const nextNomAction = document.getElementById('next-nom-action');
+  const nextNomOthers = document.getElementById('next-nom-others');
+  const nextNomOthersList = document.getElementById('next-nom-others-list');
+  const nextNomEmpty = document.getElementById('next-nom-empty');
 
   const usernameInput = document.getElementById('username-input');
   const syncBtn = document.getElementById('sync-btn');
@@ -695,6 +720,9 @@
     liveNominationCard.hidden = true;
     liveBudgetsCard.hidden = true;
     liveInflationCard.hidden = true;
+    if (liveAvailableCard) liveAvailableCard.hidden = true;
+    const proto = document.getElementById('live-nomination-prototype-card');
+    if (proto) proto.hidden = true;
   }
 
   function stopLiveSession() {
@@ -706,6 +734,9 @@
     renderedPickNos = new Set();
     nominatorsByPlayer.clear();
     inflationSamples.length = 0;
+    _suggesterDefaultApplied = false;
+    nextNomState.userChoice = null;
+    nextNomState.showingAvoid = false;
   }
 
   // Collapsible card headers -- session-scoped state, no persistence.
@@ -732,6 +763,12 @@
   // an explicit capture). Popup subscribes to storage changes so a
   // capture triggered mid-Live-Mode reflects immediately.
   let cachedPlayerPool = null;
+  let _suggesterDefaultApplied = false;
+  // Next Nomination strategy state — session-scoped. userChoice is null
+  // until the manager clicks a tab; the render uses the engine's
+  // `recommended` strategy in that case. Manual selections persist
+  // across draft events (see renderSuggester + stopLiveSession).
+  const nextNomState = { userChoice: null, showingAvoid: false };
   const POOL_STORAGE_KEY = 'playerPool';
   const POOL_MAX_AGE_MS = 60 * 60 * 1000; // 1h -- projections don't shift in-draft
 
@@ -764,6 +801,7 @@
       }
       if (!liveDraftView.hidden) {
         renderSuggester();
+        renderAvailablePlayers();
         maybeShowFirstRunTip();
       }
     });
@@ -841,20 +879,42 @@
     }
     liveSuggesterCard.hidden = false;
 
-    // No pool yet -- show the load button; hide the empty list.
+    // Reset render slots — one branch below sets what should show.
+    nextNomPrimary.hidden = true;
+    nextNomOthers.hidden = true;
+    nextNomEmpty.hidden = true;
+
+    // No pool yet — show the load button; nothing else to render.
     if (!cachedPlayerPool) {
       liveSuggesterLoadBtn.hidden = false;
-      liveSuggesterList.innerHTML = '';
+      liveSuggesterLoadBtn.textContent = 'Load full player pool';
+      if (liveSuggesterHint) liveSuggesterHint.hidden = false;
       liveSuggesterFootnote.hidden = true;
       return;
     }
+    if (liveSuggesterHint) liveSuggesterHint.hidden = true;
 
-    // Pool present -- hide the load button unless it's stale (>1h).
-    liveSuggesterLoadBtn.hidden = false; // always allow re-capture
+    liveSuggesterLoadBtn.hidden = false;
     liveSuggesterLoadBtn.textContent = 'Refresh player pool';
 
     const teams = (latestLiveDomState && latestLiveDomState.teams) || [];
-    const suggestions = liveDraft.suggestNominations({
+
+    // Reuse the live inflation factor already computed for the
+    // nomination card so the value ranges here match what the manager
+    // sees on the current-nomination card.
+    let inflationFactor = 1;
+    if (teams.length && session.draft) {
+      const slotsPerTeam = liveDraft.rosterSlotsPerTeam(session.draft);
+      const startingBudgetPerTeam =
+        (session.draft && session.draft.settings && session.draft.settings.budget) || 200;
+      inflationFactor = liveDraft.computeLiveInflation({
+        teams,
+        startingBudgetPerTeam,
+        slotsPerTeam,
+      });
+    }
+
+    const strategyRec = liveDraft.computeStrategyRecommendations({
       pool: cachedPlayerPool,
       completedPicks: session.picks || [],
       teams,
@@ -862,62 +922,571 @@
       yourManager: cachedUsername,
       yourIdentity: currentIdentity(session),
       league: session.league,
-      limit: 5,
+      inflationFactor,
     });
 
-    liveSuggesterList.innerHTML = '';
-    if (!suggestions.length) {
+    // Active tab: AVOID overlay > user's explicit choice > engine default.
+    // If the user's chosen tab has no candidates right now, we still
+    // honor their choice (the empty state explains what happened) —
+    // silently switching them back to "recommended" would erase their
+    // override without telling them.
+    let active = 'DRAIN';
+    if (nextNomState.showingAvoid) {
+      active = 'AVOID';
+    } else if (nextNomState.userChoice) {
+      active = nextNomState.userChoice;
+    } else if (strategyRec && strategyRec.recommended) {
+      active = strategyRec.recommended === 'AVOID'
+        ? 'DRAIN' // if the engine's default is AVOID, seed a primary
+        : strategyRec.recommended;
+    }
+
+    renderNextNomTabs(active, strategyRec ? strategyRec.recommended : null);
+
+    // Show the AVOID toggle whenever an AVOID candidate exists, so the
+    // manager knows the option is available — even if the current tab
+    // is one of the primary three.
+    const avoidBundle = strategyRec && strategyRec.byStrategy && strategyRec.byStrategy.AVOID;
+    const hasAvoid = !!(avoidBundle && avoidBundle.primary);
+    nextNomAvoidToggle.hidden = !hasAvoid && !nextNomState.showingAvoid;
+    if (nextNomState.showingAvoid) {
+      nextNomAvoidToggle.textContent = 'Back to strategies';
+      nextNomAvoidToggle.classList.add('is-avoiding');
+    } else {
+      nextNomAvoidToggle.textContent = 'Show players to avoid';
+      nextNomAvoidToggle.classList.remove('is-avoiding');
+    }
+
+    const rec = strategyRec && strategyRec.byStrategy
+      ? strategyRec.byStrategy[active]
+      : null;
+
+    // Default expand/collapse — apply once per session, then leave the
+    // user's manual choice alone. Late in the draft or while a player
+    // is on the block, the section starts collapsed.
+    if (!_suggesterDefaultApplied && liveSuggesterToggle && liveSuggesterBody) {
+      const slotsPerTeam = liveDraft.rosterSlotsPerTeam(session.draft);
+      const totalSlots = slotsPerTeam * (teams.length || 0);
+      let totalDrafted = 0;
+      for (const t of teams) totalDrafted += Number(t.rosterCount) || 0;
+      const progress = totalSlots > 0 ? totalDrafted / totalSlots : 0;
+      const nomActive = latestLiveDomState
+        && latestLiveDomState.nomination
+        && latestLiveDomState.nomination.playerName;
+      const shouldCollapse = progress >= 0.7 || !!nomActive;
+      liveSuggesterToggle.setAttribute('aria-expanded', shouldCollapse ? 'false' : 'true');
+      liveSuggesterBody.hidden = shouldCollapse;
+      _suggesterDefaultApplied = true;
+    }
+
+    if (!rec || !rec.primary) {
+      // Strategy-specific empty copy so the manager understands why the
+      // list is blank on the tab they chose — not just "no clear nom."
+      const emptyLabel = nextNomEmpty.querySelector('.next-nom-strategy');
+      const emptyReason = nextNomEmpty.querySelector('.next-nom-reason');
+      if (emptyLabel && emptyReason) {
+        if (active === 'TARGET') {
+          emptyLabel.textContent = 'No TARGET available';
+          emptyReason.textContent = 'Nothing available fits your roster and budget right now. Try Drain or Distract, or wait for the pool to shift.';
+        } else if (active === 'DRAIN') {
+          emptyLabel.textContent = 'No DRAIN available';
+          emptyReason.textContent = 'No player would meaningfully burn a rival budget right now.';
+        } else if (active === 'DISTRACT') {
+          emptyLabel.textContent = 'No DISTRACT available';
+          emptyReason.textContent = 'No attention-magnet player without pulling attention onto your own targets.';
+        } else if (active === 'AVOID') {
+          emptyLabel.textContent = 'Nothing to avoid';
+          emptyReason.textContent = 'No player poses a "do not nominate" risk right now.';
+        } else {
+          emptyLabel.textContent = 'No clear nomination';
+          emptyReason.textContent = 'Hold off until the next player changes the room.';
+        }
+      }
+      nextNomEmpty.hidden = false;
       liveSuggesterFootnote.hidden = false;
       liveSuggesterFootnote.textContent = teams.length
-        ? 'No high-leverage nominations right now. Try refreshing the pool if picks have landed since your last capture.'
-        : 'Suggestions activate once the draft-room DOM feed connects.';
+        ? `Updated ${relativeTime(cachedPlayerPool.capturedAt)}`
+        : 'Recommendations activate once the draft-room DOM feed connects.';
       return;
     }
 
-    for (const s of suggestions) {
-      const li = document.createElement('li');
-      if (s.selfNeed) li.classList.add('is-self-need');
-
-      const player = document.createElement('div');
-      player.className = 'live-suggester-player';
-      const name = document.createElement('div');
-      name.className = 'live-suggester-name';
-      name.textContent = s.name;
-      player.appendChild(name);
-
-      const meta = document.createElement('div');
-      meta.className = 'live-suggester-meta';
-      meta.appendChild(document.createTextNode(
-        [s.position, s.team].filter(Boolean).join(' · ') || s.position || ''
-      ));
-      if (s.tier) {
-        const pill = document.createElement('span');
-        const isElite = s.tier.tierIndex <= 2;
-        pill.className = 'live-suggester-tier-pill' + (isElite ? ' is-elite' : '');
-        pill.textContent = `${s.position} T${s.tier.tierIndex + 1}`;
-        meta.appendChild(pill);
-      }
-      player.appendChild(meta);
-
-      const reason = document.createElement('div');
-      reason.className = 'live-suggester-reason';
-      const teamsWord = s.needyCount === 1 ? 'team needs' : 'teams need';
-      reason.textContent = s.selfNeed
-        ? `${s.needyCount} other ${teamsWord} this position (you do too — risky)`
-        : `${s.needyCount} ${teamsWord} this position`;
-      player.appendChild(reason);
-
-      // Deliberately not displaying a dollar amount here. burnPotential
-      // drives the RANK (bigger = better nomination target) but shown
-      // as a $ number it reads like a "nomination price," which is
-      // misleading -- users open at $1 regardless.
-
-      li.appendChild(player);
-      liveSuggesterList.appendChild(li);
-    }
+    renderNextNomPrimary(rec.primary);
+    renderNextNomOthers(rec.secondaries || []);
 
     liveSuggesterFootnote.hidden = false;
-    liveSuggesterFootnote.textContent = `Based on projections captured ${relativeTime(cachedPlayerPool.capturedAt)}.`;
+    liveSuggesterFootnote.textContent = `Updated ${relativeTime(cachedPlayerPool.capturedAt)}`;
+  }
+
+  function strategyLabel(s) {
+    if (s === 'DRAIN') return 'Drain budgets';
+    if (s === 'DISTRACT') return 'Distract';
+    if (s === 'TARGET') return 'Target';
+    if (s === 'AVOID') return 'Avoid nominating';
+    if (s === 'WAIT') return 'Wait';
+    return '';
+  }
+
+  function strategyClass(s) {
+    if (s === 'DRAIN') return 'is-drain';
+    if (s === 'DISTRACT') return 'is-distract';
+    if (s === 'TARGET') return 'is-target';
+    if (s === 'AVOID') return 'is-wait';
+    if (s === 'WAIT') return 'is-wait';
+    return '';
+  }
+
+  function formatValueRange(range) {
+    if (!range) return '';
+    if (range.low === range.high) return `Est. $${range.low}`;
+    return `Est. $${range.low}–${range.high}`;
+  }
+
+  function metaLine(c) {
+    const parts = [];
+    if (c.position) parts.push(c.position);
+    if (c.team) parts.push(c.team);
+    if (c.tier && c.tier.tierIndex != null) parts.push(`Tier ${c.tier.tierIndex + 1}`);
+    return parts.join(' · ');
+  }
+
+  function reasonFor(c) {
+    if (!c) return '';
+    // Reason no longer names bidders — the Likely bidders block does.
+    // Keeping reason as the strategic why avoids duplicating the same
+    // manager names twice in the same card.
+    if (c.strategy === 'DRAIN') {
+      const budgetHint = c.budgetHeavyCount >= 2
+        ? 'have big budgets to burn'
+        : 'have budget to spend';
+      return `Multiple ${c.position}-needy teams ${budgetHint} on this tier.`;
+    }
+    if (c.strategy === 'DISTRACT') {
+      return `Likely to attract bids from rival teams — money you'd rather see spent here than on your targets.`;
+    }
+    if (c.strategy === 'TARGET') {
+      return `Fits your roster and you have the budget${c.yourMaxBid ? ` ($${c.yourMaxBid} left)` : ''}. Buy now before scarcity lifts the price.`;
+    }
+    if (c.strategy === 'WAIT' || c.strategy === 'AVOID') {
+      const topName = c.topBidders && c.topBidders[0] && c.topBidders[0].manager;
+      const rival = topName ? topName : 'A rival';
+      const budget = c.topBidders && c.topBidders[0] && c.topBidders[0].maxBid
+        ? ` ($${c.topBidders[0].maxBid} left)` : '';
+      return `${rival}${budget} is likely to bid aggressively and expose your need at ${c.position}. Wait for their budget to shrink.`;
+    }
+    return '';
+  }
+
+  function renderMarketDelta(deltaPct) {
+    if (deltaPct == null || Math.abs(deltaPct) < 8) {
+      nextNomMarket.hidden = true;
+      nextNomMarket.className = 'next-nom-market';
+      nextNomMarket.textContent = '';
+      return;
+    }
+    const up = deltaPct > 0;
+    nextNomMarket.hidden = false;
+    nextNomMarket.className = 'next-nom-market ' + (up ? 'is-up' : 'is-down');
+    nextNomMarket.textContent = `Market ${up ? '+' : ''}${deltaPct}%`;
+  }
+
+  function renderBidders(topBidders) {
+    nextNomBiddersList.innerHTML = '';
+    if (!topBidders || !topBidders.length) {
+      nextNomBidders.hidden = true;
+      return;
+    }
+    nextNomBidders.hidden = false;
+    for (const b of topBidders) {
+      const li = document.createElement('li');
+      li.className = 'next-nom-bidder';
+      const name = document.createElement('span');
+      name.className = 'next-nom-bidder-name';
+      name.textContent = b.manager || 'Unknown';
+      const budget = document.createElement('span');
+      budget.className = 'next-nom-bidder-budget';
+      budget.textContent = `$${b.maxBid || 0}`;
+      li.appendChild(name);
+      li.appendChild(budget);
+      nextNomBiddersList.appendChild(li);
+    }
+  }
+
+  function renderNextNomTabs(active, recommended) {
+    // Bar is only meaningful once we have a session; leave hidden if
+    // the caller passes nothing meaningful.
+    nextNomStrategyBar.hidden = false;
+    // AVOID mode grays the tab bar (no tab is "active" among the three
+    // primary strategies while the manager is inspecting AVOID).
+    const barActive = nextNomState.showingAvoid ? null : active;
+    for (const tab of nextNomTabs) {
+      const s = tab.dataset.strategy;
+      const isActive = s === barActive;
+      tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      tab.tabIndex = isActive ? 0 : -1;
+    }
+    // Focus fallback — if no tab is selectable, make the first tab
+    // keyboard-reachable so users can still tab into the control.
+    if (!barActive && nextNomTabs.length) nextNomTabs[0].tabIndex = 0;
+
+    // "Draft Pilot recommends" — only when the user hasn't overridden
+    // and only when the engine has a recommendation to share.
+    if (!nextNomState.userChoice && !nextNomState.showingAvoid && recommended) {
+      nextNomRecommends.hidden = false;
+      // Short form (single word) to keep the line one row on narrow
+      // extension widths.
+      nextNomRecommendsValue.textContent = recommended;
+    } else {
+      nextNomRecommends.hidden = true;
+    }
+  }
+
+  // Tab wiring — click sets user's choice; ArrowLeft/ArrowRight cycles.
+  for (const tab of nextNomTabs) {
+    tab.addEventListener('click', () => {
+      const s = tab.dataset.strategy;
+      if (!s) return;
+      nextNomState.userChoice = s;
+      nextNomState.showingAvoid = false;
+      renderSuggester();
+    });
+    tab.addEventListener('keydown', (evt) => {
+      if (evt.key !== 'ArrowLeft' && evt.key !== 'ArrowRight') return;
+      const idx = nextNomTabs.indexOf(tab);
+      if (idx < 0) return;
+      const next = evt.key === 'ArrowRight'
+        ? nextNomTabs[(idx + 1) % nextNomTabs.length]
+        : nextNomTabs[(idx - 1 + nextNomTabs.length) % nextNomTabs.length];
+      if (next) {
+        next.focus();
+        next.click();
+      }
+      evt.preventDefault();
+    });
+  }
+
+  if (nextNomAvoidToggle) {
+    nextNomAvoidToggle.addEventListener('click', () => {
+      nextNomState.showingAvoid = !nextNomState.showingAvoid;
+      renderSuggester();
+    });
+  }
+
+  function renderNextNomPrimary(c) {
+    nextNomPrimary.hidden = false;
+    nextNomStrategy.textContent = strategyLabel(c.strategy);
+    nextNomStrategy.className = `next-nom-strategy ${strategyClass(c.strategy)}`;
+    nextNomName.textContent = c.name;
+    nextNomMeta.textContent = metaLine(c);
+    const range = formatValueRange(c.valueRange);
+    nextNomValue.textContent = range;
+    nextNomValue.hidden = !range;
+    renderMarketDelta(c.marketDeltaPct);
+    nextNomReason.textContent = reasonFor(c);
+    // Bidders block also covers the WAIT case: seeing WHO would push
+    // the price is exactly the information a WAIT recommendation is
+    // built on.
+    renderBidders(c.topBidders);
+
+    // WAIT / AVOID: no nominate action — the whole point is "don't
+    // nominate this player right now."
+    if (c.strategy === 'WAIT' || c.strategy === 'AVOID') {
+      nextNomAction.hidden = true;
+    } else {
+      nextNomAction.hidden = false;
+      nextNomAction.dataset.player = c.name;
+      nextNomAction.classList.remove('is-copied');
+      nextNomAction.textContent = 'Nominate';
+    }
+  }
+
+  function renderNextNomOthers(secondaries) {
+    nextNomOthersList.innerHTML = '';
+    if (!secondaries.length) {
+      nextNomOthers.hidden = true;
+      return;
+    }
+    nextNomOthers.hidden = false;
+    for (const c of secondaries) {
+      const li = document.createElement('li');
+      li.className = 'next-nom-other';
+
+      const name = document.createElement('span');
+      name.className = 'next-nom-other-name';
+      name.textContent = c.name;
+      li.appendChild(name);
+
+      const value = document.createElement('span');
+      value.className = 'next-nom-other-value';
+      value.textContent = formatValueRange(c.valueRange) || '';
+      li.appendChild(value);
+
+      // Position + tier — more useful than a redundant strategy chip
+      // (every secondary here shares the active strategy).
+      const meta = document.createElement('span');
+      meta.className = 'next-nom-other-strategy';
+      const bits = [c.position];
+      if (c.tier && c.tier.tierIndex != null) bits.push(`T${c.tier.tierIndex + 1}`);
+      meta.textContent = bits.join(' · ');
+      li.appendChild(meta);
+
+      nextNomOthersList.appendChild(li);
+    }
+  }
+
+  // "Nominate" here is a convenience: the extension can't drive the
+  // Sleeper nomination input, so we copy the player name to clipboard
+  // and briefly confirm. The manager pastes into the Sleeper box.
+  if (nextNomAction) {
+    nextNomAction.addEventListener('click', async () => {
+      const name = nextNomAction.dataset.player || '';
+      if (!name) return;
+      try {
+        await navigator.clipboard.writeText(name);
+        nextNomAction.textContent = 'Copied — paste in Sleeper';
+        nextNomAction.classList.add('is-copied');
+        setTimeout(() => {
+          nextNomAction.textContent = 'Nominate';
+          nextNomAction.classList.remove('is-copied');
+        }, 2200);
+      } catch (_) {
+        // Clipboard denied — leave the button state alone.
+      }
+    });
+  }
+
+  // ---------- Available Players -------------------------------------
+  // Complementary to Next Nomination: exploratory live market. State
+  // is session-scoped (search text, active position chip, sort). Rows
+  // are computed by liveDraft.listAvailablePlayers so no valuation is
+  // duplicated here.
+  const liveAvailableCard = document.getElementById('live-available-card');
+  const liveAvailableToggle = document.getElementById('live-available-toggle');
+  const liveAvailableBody = document.getElementById('live-available-body');
+  const availSummary = document.getElementById('avail-summary');
+  const availSearch = document.getElementById('avail-search');
+  const availPositionChips = document.getElementById('avail-position-chips');
+  const availSort = document.getElementById('avail-sort');
+  const availList = document.getElementById('avail-list');
+  const availEmpty = document.getElementById('avail-empty');
+  const availPagination = document.getElementById('avail-pagination');
+  const availPrevBtn = document.getElementById('avail-prev');
+  const availNextBtn = document.getElementById('avail-next');
+  const availPageStatus = document.getElementById('avail-page-status');
+
+  wireCollapse(liveAvailableToggle, liveAvailableBody);
+
+  const AVAIL_PAGE_SIZE = 8;
+  const availState = { search: '', position: 'ALL', sort: 'value', page: 1 };
+  let _availChipsSignature = '';
+
+  function resetAvailPage() { availState.page = 1; }
+
+  if (availSearch) {
+    availSearch.addEventListener('input', () => {
+      availState.search = availSearch.value || '';
+      resetAvailPage();
+      renderAvailablePlayers();
+    });
+  }
+  if (availSort) {
+    availSort.addEventListener('change', () => {
+      availState.sort = availSort.value || 'value';
+      resetAvailPage();
+      renderAvailablePlayers();
+    });
+  }
+  if (availPrevBtn) {
+    availPrevBtn.addEventListener('click', () => {
+      if (availState.page > 1) {
+        availState.page -= 1;
+        renderAvailablePlayers();
+      }
+    });
+  }
+  if (availNextBtn) {
+    availNextBtn.addEventListener('click', () => {
+      availState.page += 1;
+      renderAvailablePlayers();
+      // Guard: if we overshot (state changed mid-click), renderAvailablePlayers
+      // clamps back down so the button never leaves the user on an empty page.
+    });
+  }
+
+  function renderPositionChips(positions) {
+    // Keep ALL first, then the positions the pool actually contains.
+    const chips = ['ALL', ...positions];
+    const signature = chips.join('|');
+    if (signature === _availChipsSignature) {
+      // Only update the active state.
+      for (const btn of availPositionChips.querySelectorAll('.avail-chip')) {
+        const pos = btn.dataset.position;
+        btn.classList.toggle('is-active', pos === availState.position);
+      }
+      return;
+    }
+    _availChipsSignature = signature;
+    availPositionChips.innerHTML = '';
+    for (const pos of chips) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'avail-chip';
+      if (pos === availState.position) btn.classList.add('is-active');
+      btn.dataset.position = pos;
+      btn.textContent = pos;
+      btn.addEventListener('click', () => {
+        availState.position = pos;
+        resetAvailPage();
+        for (const b of availPositionChips.querySelectorAll('.avail-chip')) {
+          b.classList.toggle('is-active', b.dataset.position === pos);
+        }
+        renderAvailablePlayers();
+      });
+      availPositionChips.appendChild(btn);
+    }
+  }
+
+  function formatAvailValueRange(range) {
+    if (!range) return '—';
+    if (range.low === range.high) return `$${range.low}`;
+    return `$${range.low}–${range.high}`;
+  }
+
+  function renderAvailablePlayers() {
+    const session = activeLiveSession && activeLiveSession.getState();
+    if (!session || !session.isAuction || session.status !== 'active') {
+      liveAvailableCard.hidden = true;
+      return;
+    }
+    if (!featureFlags.isEnabled('bidRecommendations')) {
+      liveAvailableCard.hidden = true;
+      return;
+    }
+    // No pool -> the Next Nomination card already prompts to load the
+    // pool; don't stack a second empty card in the same view.
+    if (!cachedPlayerPool) {
+      liveAvailableCard.hidden = true;
+      return;
+    }
+    liveAvailableCard.hidden = false;
+
+    const teams = (latestLiveDomState && latestLiveDomState.teams) || [];
+    let inflationFactor = 1;
+    if (teams.length && session.draft) {
+      const slotsPerTeam = liveDraft.rosterSlotsPerTeam(session.draft);
+      const startingBudgetPerTeam =
+        (session.draft && session.draft.settings && session.draft.settings.budget) || 200;
+      inflationFactor = liveDraft.computeLiveInflation({
+        teams,
+        startingBudgetPerTeam,
+        slotsPerTeam,
+      });
+    }
+
+    // Request the full filtered/sorted set; pagination happens
+    // client-side so page controls can page through without re-hitting
+    // the engine. Cap is generous — an auction pool won't exceed it.
+    const result = liveDraft.listAvailablePlayers({
+      pool: cachedPlayerPool,
+      completedPicks: session.picks || [],
+      teams,
+      tierAggregates: cachedTierAggregates,
+      yourManager: cachedUsername,
+      yourIdentity: currentIdentity(session),
+      league: session.league,
+      inflationFactor,
+      search: availState.search,
+      position: availState.position,
+      sort: availState.sort,
+      limit: 1000,
+    });
+
+    // Position chips reflect the live pool composition.
+    renderPositionChips(result.positions || []);
+
+    // Summary line: total available + counts for common positions.
+    if (result.totalAvailable > 0) {
+      const bp = result.byPosition || {};
+      const parts = [];
+      for (const p of ['QB', 'RB', 'WR', 'TE']) {
+        if (bp[p]) parts.push(`${p} ${bp[p]}`);
+      }
+      const detail = parts.length ? ` · ${parts.join(' · ')}` : '';
+      availSummary.hidden = false;
+      availSummary.textContent = `${result.totalAvailable} available${detail}`;
+    } else {
+      availSummary.hidden = true;
+    }
+
+    availList.innerHTML = '';
+    if (!result.rows.length) {
+      availEmpty.hidden = false;
+      availEmpty.textContent = result.totalAvailable === 0
+        ? 'No players remain in the pool.'
+        : 'No players found. Try another search or filter.';
+      availPagination.hidden = true;
+      return;
+    }
+    availEmpty.hidden = true;
+
+    // Client-side pagination — 8 rows per page. Clamp page in case a
+    // filter change or a mid-draft pool refresh shrank the result set
+    // below where the user had paged to.
+    const totalPages = Math.max(1, Math.ceil(result.rows.length / AVAIL_PAGE_SIZE));
+    if (availState.page > totalPages) availState.page = totalPages;
+    if (availState.page < 1) availState.page = 1;
+    const start = (availState.page - 1) * AVAIL_PAGE_SIZE;
+    const pageRows = result.rows.slice(start, start + AVAIL_PAGE_SIZE);
+
+    for (const r of pageRows) {
+      const li = document.createElement('li');
+      li.className = 'avail-row';
+
+      const name = document.createElement('div');
+      name.className = 'avail-name';
+      name.textContent = r.name;
+      li.appendChild(name);
+
+      const value = document.createElement('div');
+      value.className = 'avail-value';
+      value.textContent = formatAvailValueRange(r.valueRange);
+      li.appendChild(value);
+
+      const meta = document.createElement('div');
+      meta.className = 'avail-meta';
+      const metaBits = [r.position];
+      if (r.team) metaBits.push(r.team);
+      if (r.tier && r.tier.tierIndex != null) metaBits.push(`Tier ${r.tier.tierIndex + 1}`);
+      meta.textContent = metaBits.join(' · ');
+      if (r.fit === 'starter') {
+        const fit = document.createElement('span');
+        fit.className = 'avail-fit';
+        fit.textContent = 'Fits';
+        meta.appendChild(fit);
+      }
+      li.appendChild(meta);
+
+      const market = document.createElement('div');
+      market.className = 'avail-market';
+      if (r.marketDeltaPct != null && Math.abs(r.marketDeltaPct) >= 8) {
+        const up = r.marketDeltaPct > 0;
+        market.classList.add(up ? 'is-up' : 'is-down');
+        market.textContent = `Market ${up ? '+' : ''}${r.marketDeltaPct}%`;
+      }
+      li.appendChild(market);
+
+      availList.appendChild(li);
+    }
+
+    if (totalPages > 1) {
+      availPagination.hidden = false;
+      availPrevBtn.disabled = availState.page <= 1;
+      availNextBtn.disabled = availState.page >= totalPages;
+      const rangeStart = start + 1;
+      const rangeEnd = start + pageRows.length;
+      availPageStatus.textContent = `${rangeStart}–${rangeEnd} of ${result.rows.length}`;
+    } else {
+      availPagination.hidden = true;
+    }
   }
 
   // Content script pushes DOM-scraped nomination + budgets. We filter by
@@ -1067,7 +1636,7 @@
   function formatLine(state) {
     const parts = [];
     parts.push(state.isAuction ? 'Auction' : 'Snake');
-    if (state.isAuction && state.budget) parts.push(`$${state.budget} budget`);
+    if (state.isAuction && state.budget) parts.push(`$${state.budget}`);
     if (state.teamCount) parts.push(`${state.teamCount} teams`);
     return parts.join(' · ');
   }
@@ -1083,18 +1652,30 @@
   }
 
   function renderLiveState(state) {
+    // Status badge lives in the persistent mode-crumb now, so it must
+    // be cleared whenever we leave the active state -- otherwise a
+    // stale LIVE pill lingers over "connecting" / error screens.
+    const clearStatusBadge = () => {
+      if (liveStatusBadge) {
+        liveStatusBadge.textContent = '';
+        liveStatusBadge.className = 'live-status-badge';
+      }
+    };
     if (state.status === 'loading') {
       hideLiveSubsections();
+      clearStatusBadge();
       liveConnecting.hidden = false;
       return;
     }
     if (state.status === 'error') {
       hideLiveSubsections();
+      clearStatusBadge();
       liveError.hidden = false;
       liveErrorMsg.textContent = state.lastError || 'Something went wrong.';
       return;
     }
     if (state.status === 'stopped') {
+      clearStatusBadge();
       return; // view is being swapped away; nothing to paint
     }
 
@@ -1124,6 +1705,7 @@
     // pool before the DOM feed arrives; it re-renders with real data
     // as soon as latestLiveDomState comes in.
     renderSuggester();
+    renderAvailablePlayers();
     // If a DOM payload already landed during bootstrap, paint it now.
     if (latestLiveDomState) renderLiveDomState();
   }
@@ -1282,6 +1864,7 @@
     renderTeamBudgets(teams, { nomination, leagueValue });
     renderYourTeam(teams);
     renderSuggester();
+    renderAvailablePlayers();
     maybeShowFirstRunTip();
     checkLiveDomStale();
   }
@@ -1317,31 +1900,13 @@
 
     const inflation = ctx.inflation != null ? ctx.inflation : 1;
     const pct = Math.round((inflation - 1) * 100);
+    const absPct = Math.abs(pct);
     const tone = pct >= 3 ? 'is-positive' : pct <= -3 ? 'is-negative' : '';
 
-    // Primary number. Sign always shown so ± reads unambiguously; 0 gets
-    // no sign so it reads as neutral rather than "positive zero."
-    liveInflFactor.textContent = pct === 0
-      ? '0%'
-      : `${pct > 0 ? '+' : ''}${pct}%`;
-    liveInflFactor.className = 'live-infl-factor' + (tone ? ' ' + tone : '');
-
-    // Compact status word for the ambient chip. Bucketed on the same
-    // ±5% / ±15% thresholds as the interpretation copy.
-    if (liveInflWord) {
-      let word = 'STEADY';
-      if (pct >= 15) word = 'RUNAWAY';
-      else if (pct >= 5) word = 'HOT';
-      else if (pct <= -15) word = 'FROZEN';
-      else if (pct <= -5) word = 'COOL';
-      liveInflWord.textContent = word;
-      liveInflWord.className = 'live-infl-word' + (tone ? ' ' + tone : '');
-    }
-
-    // Trend arrow: subtle nudge, not a chart. Requires the 5-pick
-    // lookback samples to have accumulated (see INFLATION_TREND_LOOKBACK_PICKS).
-    let trendDir = 'flat'; // 'up' | 'down' | 'flat'
-    let trendMagnitude = 'mild'; // 'strong' | 'mild'
+    // Trend read. Kept subtle: only nudges the copy near neutral where
+    // the level alone doesn't communicate momentum.
+    let trendDir = 'flat';
+    let trendMagnitude = 'mild';
     if (ctx.inflationTrend) {
       const dPct = Math.round(ctx.inflationTrend.delta * 100);
       if (dPct >= 3) { trendDir = 'up'; trendMagnitude = dPct >= 8 ? 'strong' : 'mild'; }
@@ -1361,41 +1926,66 @@
       liveInflArrow.className = 'live-infl-arrow';
     }
 
-    // Interpretation + advice. Bucketed on the ±5% / ±15% bands so the
-    // wording changes at meaningful thresholds, not on every jitter.
-    // Trend nudges the advice when it disagrees with the level.
-    let interp, advice;
-    if (pct >= 15) {
-      interp = 'Teams are hoarding cash.';
-      advice = "Prices on the best players left will spike. Don't hesitate on your must-haves.";
-    } else if (pct >= 5) {
-      interp = 'Teams are holding back.';
-      advice = 'Add a few dollars to your targets. Bidding will heat up.';
-    } else if (pct <= -15) {
-      interp = 'Money is drying up fast.';
-      advice = "Stay patient. Bargains are coming — let others burn what they have left.";
-    } else if (pct <= -5) {
-      interp = 'Room is spending faster than expected.';
-      advice = 'Value should show up soon. Hunt for it on your next few nominations.';
+    // Primary plain-language summary. Percentage is preserved but read
+    // as a phrase, not a chip. Sits in the always-visible header row.
+    let summary;
+    if (absPct < 3) {
+      summary = 'Prices near expected';
+    } else if (pct > 0) {
+      summary = `Prices ${absPct}% above expected`;
     } else {
-      interp = 'Market pace looks normal.';
-      advice = 'Stick to your values.';
+      summary = `Prices ${absPct}% below expected`;
     }
-    // Trend override: strong upswing near neutral still deserves a heads-up.
-    if (trendDir === 'up' && trendMagnitude === 'strong' && Math.abs(pct) < 5) {
-      interp = 'Prices are climbing fast.';
-      advice = 'Room just got cautious. Expect the next few players to go for more.';
-    } else if (trendDir === 'down' && trendMagnitude === 'strong' && Math.abs(pct) < 5) {
-      interp = 'Spending just spiked.';
-      advice = 'Money is leaving the room quickly. Wait for the drop-off.';
+    // Near-neutral level but strong momentum -- surface the direction so
+    // the manager isn't lulled by the flat headline.
+    if (absPct < 5 && trendDir === 'up' && trendMagnitude === 'strong') {
+      summary = 'Prices climbing quickly';
+    } else if (absPct < 5 && trendDir === 'down' && trendMagnitude === 'strong') {
+      summary = 'Spending accelerating';
     }
-    liveInflInterp.textContent = interp;
-    liveInflInterp.className = 'live-infl-interp' + (tone ? ' ' + tone : '');
+    if (liveInflSummary) {
+      liveInflSummary.textContent = summary;
+      liveInflSummary.className = 'live-infl-summary' + (tone ? ' ' + tone : '');
+    }
+
+    // Manager-facing advice. Bucketed on ±5% / ±15% -- meaningful
+    // thresholds, not per-tick jitter. Trend overrides for the
+    // near-neutral cases where momentum tells a different story.
+    let advice;
+    if (pct >= 15) {
+      advice = 'Players are getting expensive. Be aggressive on must-haves.';
+    } else if (pct >= 5) {
+      advice = 'Prices are rising. Add a little to your targets.';
+    } else if (pct <= -15) {
+      advice = 'Bargains may be coming. Stay patient.';
+    } else if (pct <= -5) {
+      advice = 'Value is showing up. Hunt for it on your next few nominations.';
+    } else {
+      advice = 'Spending is tracking normally.';
+    }
+    if (absPct < 5 && trendDir === 'up' && trendMagnitude === 'strong') {
+      advice = 'Room just got cautious. Next players may go for more.';
+    } else if (absPct < 5 && trendDir === 'down' && trendMagnitude === 'strong') {
+      advice = 'Money is leaving the room. Wait for the drop-off.';
+    }
     liveInflAdvice.textContent = advice;
 
-    // One compact supporting row. Keeps the underlying math visible for
-    // users who want to sanity-check, without a stat grid.
-    const startingPerTeam = session.budget || 0;
+    // Legacy interp element -- kept in the DOM (hidden) so other
+    // consumers don't null-deref; content mirrors the summary phrase.
+    if (liveInflInterp) {
+      liveInflInterp.textContent = summary;
+      liveInflInterp.className = 'live-infl-interp' + (tone ? ' ' + tone : '');
+    }
+    // Legacy chip nodes (factor / word) stay hidden but populated so
+    // any downstream reader (tests, exports) still sees a value.
+    if (liveInflFactor) {
+      liveInflFactor.textContent = pct === 0
+        ? '0%'
+        : `${pct > 0 ? '+' : ''}${pct}%`;
+    }
+    if (liveInflWord) liveInflWord.textContent = '';
+
+    // Compact supporting row -- underlying $ math, kept secondary.
     const slotsPerTeam = liveDraft.rosterSlotsPerTeam(session.draft);
     const totalSlots = slotsPerTeam * teams.length;
     let totalRemaining = 0;
@@ -1406,13 +1996,21 @@
     }
     const remainingSlots = Math.max(1, totalSlots - totalDrafted);
     const perSlot = totalRemaining / remainingSlots;
-    // Show whole dollars when the per-slot value is >=10 (typical mid/late
-    // draft) and a decimal earlier when the room is still cash-rich; keeps
-    // the row scannable without losing precision.
     const perSlotStr = perSlot >= 10
       ? `$${Math.round(perSlot)}`
-      : `$${perSlot.toFixed(1)}`;
-    liveInflSupport.textContent = `$${totalRemaining.toLocaleString()} left · ${perSlotStr} / open spot`;
+      : `$${perSlot.toFixed(2)}`;
+    const signedPct = pct === 0 ? '0%' : `${pct > 0 ? '+' : ''}${pct}%`;
+    liveInflSupport.textContent =
+      `$${totalRemaining.toLocaleString()} remaining · ${perSlotStr} / open spot · ${signedPct} inflation`;
+
+    // Freshness line -- explicit "based on N picks" phrasing so a
+    // stale sample never reads as urgency ("FROZEN" language removed).
+    if (liveInflFreshness) {
+      const picks = totalDrafted;
+      liveInflFreshness.textContent = picks > 0
+        ? `Based on ${picks} pick${picks === 1 ? '' : 's'} so far`
+        : 'Based on current draft data';
+    }
   }
 
   /**
@@ -1488,6 +2086,8 @@
     ctx = ctx || {};
     if (!nom) {
       liveNominationCard.hidden = true;
+      const proto = document.getElementById('live-nomination-prototype-card');
+      if (proto) proto.hidden = true;
       return;
     }
     liveNominationCard.hidden = false;
@@ -1496,7 +2096,9 @@
     const metaParts = [];
     if (nom.position) metaParts.push(nom.position);
     if (nom.team) metaParts.push(nom.team);
-    liveNominationMeta.textContent = metaParts.join(' · ');
+    // Joined with a space (not " · ") so the chip styling on this
+    // element reads as a single "RB IND" tag rather than a bullet list.
+    liveNominationMeta.textContent = metaParts.join(' ');
 
     // Tier badge: "RB Tier 1" / "WR Tier 3" pill next to position.
     // Neutralized — no more elite-green accent. Color is reserved for
@@ -1518,7 +2120,11 @@
     // this stays hidden rather than showing partial info.
     if (nom.openingBidder) {
       liveNominationNominator.hidden = false;
-      liveNominationNominator.innerHTML = '';
+      liveNominationNominator.innerHTML =
+        '<svg class="live-nomination-nominator-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+        + '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>'
+        + '<circle cx="12" cy="7" r="4"/>'
+        + '</svg>';
       liveNominationNominator.appendChild(document.createTextNode('Nominated by '));
       const who = document.createElement('strong');
       who.textContent = nom.openingBidder;
@@ -1552,14 +2158,14 @@
       nom.topBidder,
       currentIdentity(activeLiveSession && activeLiveSession.getState())
     );
-    if (iAmTopBidder) {
-      liveNominationStatus.textContent = 'YOUR BID';
-      liveNominationStatus.className = 'live-nomination-status is-you';
-    } else {
-      liveNominationStatus.textContent = nom.status || 'LIVE';
-      liveNominationStatus.className = 'live-nomination-status' +
-        (nom.status && nom.status !== 'BIDDING' ? ' is-paused' : '');
-    }
+    // (The top-of-card status pill was removed -- draft LIVE/PAUSED state
+    // is shown near the Live Draft Mode header, and ownership -- YOUR BID
+    // -- is surfaced inside the decision block below.)
+
+    // Ownership badge inside the decision block. Shown only when the
+    // user is the current top bidder.
+    const _recBadge = document.getElementById('live-nomination-rec-badge');
+    if (_recBadge) _recBadge.hidden = !iAmTopBidder;
 
     // (Top-bid tile removed -- the current top bid is still used
     // internally to render the verdict text below, but no longer shown
@@ -1628,6 +2234,10 @@
       liveNominationRecHeadline.textContent = 'NO VALUE DATA';
       liveNominationRecRange.hidden = false;
       liveNominationRecRange.innerHTML = 'Load the player pool (Export My Draft Room) to see recommendations for this player.';
+      const _reasonEl = document.getElementById('live-nomination-rec-reason');
+      const _metricsEl = document.getElementById('live-nomination-rec-metrics');
+      if (_reasonEl) { _reasonEl.hidden = true; _reasonEl.textContent = ''; }
+      if (_metricsEl) { _metricsEl.hidden = true; }
       liveNominationFit.hidden = true;
       liveNominationWhy.hidden = true;
       liveNominationComp.hidden = true;
@@ -1763,7 +2373,368 @@
     try { renderDetailsPanel({ rec, insights, position: nom.position }); }
     catch (err) { console.error('[DraftPilot] renderDetailsPanel failed:', err); }
 
+    // Price-visualization card is the LIVE On-the-Block card. It
+    // reads the exact same rec/nom objects the (now-hidden) production
+    // card just populated -- the production DOM stays in the page so
+    // `mirrorProductionIntoPrototype` can source its context /
+    // competition / alternatives / details from the already-rendered
+    // sub-nodes without duplicating any engine logic.
+    //
+    // Fall-through: if the prototype cannot render (legacy path with
+    // no fairValueRange, or `bidEngine` disabled), it leaves its own
+    // card hidden and we let the production card stay visible so the
+    // user still gets a recommendation surface.
+    try { renderPricePrototype(nom, rec); }
+    catch (err) { console.error('[DraftPilot] renderPricePrototype failed:', err); }
+
+    const _protoCard = document.getElementById('live-nomination-prototype-card');
+    if (_protoCard && !_protoCard.hidden) {
+      liveNominationCard.hidden = true;
+    }
+
     renderYourTeamStrip(nom, teams);
+  }
+
+  /**
+   * PROTOTYPE -- Price visualization variant of On-the-Block.
+   * Renders below the production card using the exact same data:
+   * every $ value comes from the bidEngine's rec object; no new
+   * math, no fresh calculations.
+   *
+   * Layout:
+   *   Player identity
+   *   BID TO $X / PASS
+   *   Roster context (rec.primaryReason)
+   *   Horizontal price meter [Value | Fair | Stretch | Too high]
+   *   Markers for current bid + max bid
+   */
+  function renderPricePrototype(nom, rec) {
+    const card = document.getElementById('live-nomination-prototype-card');
+    if (!card) return;
+
+    // Only render for the bidEngine path -- legacy fallback doesn't
+    // carry a fairValueRange we can trust.
+    if (!nom || !rec || rec.engine !== 'bidEngine') {
+      card.hidden = true;
+      return;
+    }
+
+    const yourMax = Math.max(1, Math.round(rec.recommendedMax));
+    const currentBid = Math.max(0, Math.round(rec.currentBid || 0));
+    const fvr = rec.fairValueRange || {};
+    let fvLow = fvr.low != null ? fvr.low : (rec.fairValue != null ? rec.fairValue : null);
+    let fvHigh = fvr.high != null ? fvr.high : (rec.fairValue != null ? rec.fairValue : null);
+    if (fvLow == null || fvHigh == null) {
+      card.hidden = true;
+      return;
+    }
+    if (fvLow > fvHigh) { const t = fvLow; fvLow = fvHigh; fvHigh = t; }
+
+    card.hidden = false;
+
+    // --- Header: mirror production so the position/team chip and
+    // tier badge stay in lockstep with whatever renderNomination
+    // wrote (tier lives on ctx, not nom, so re-deriving from nom
+    // would silently drop the badge). ---
+    document.getElementById('live-prototype-name').textContent =
+      nom.playerName || 'Unknown player';
+
+    const srcMeta = document.getElementById('live-nomination-meta');
+    const dstMeta = document.getElementById('live-prototype-meta');
+    if (srcMeta && dstMeta) {
+      dstMeta.textContent = srcMeta.textContent;
+    }
+
+    const srcTier = document.getElementById('live-nomination-tier');
+    const dstTier = document.getElementById('live-prototype-tier');
+    if (srcTier && dstTier) {
+      dstTier.hidden = srcTier.hidden;
+      dstTier.textContent = srcTier.textContent;
+      // Mirror any state class (is-elite etc.) so the tier styling
+      // stays consistent with whatever production decided.
+      dstTier.className = srcTier.className;
+    }
+
+    // --- Recommendation headline: same three-state grammar as the
+    // production component, so the A/B compare only tests the meter. ---
+    const recEl = document.getElementById('live-prototype-rec');
+    const headlineEl = document.getElementById('live-prototype-headline');
+    const cls = rec.recommendation === 'BUY' ? 'is-buy'
+      : rec.recommendation === 'CAUTION' ? 'is-caution' : 'is-pass';
+    recEl.className = 'live-nomination-rec has-yourmax ' + cls;
+    headlineEl.textContent = '';
+    const verbSpan = document.createElement('span');
+    verbSpan.className = 'live-nomination-rec-verb';
+    if (rec.recommendation === 'PASS') {
+      verbSpan.textContent = 'PASS';
+      headlineEl.appendChild(verbSpan);
+    } else {
+      verbSpan.textContent = 'BID TO';
+      const amountSpan = document.createElement('span');
+      amountSpan.className = 'live-nomination-rec-amount';
+      amountSpan.textContent = `$${yourMax}`;
+      headlineEl.appendChild(verbSpan);
+      headlineEl.appendChild(document.createTextNode(' '));
+      headlineEl.appendChild(amountSpan);
+    }
+
+    // --- Sub-status (same tri-state grammar production uses). ---
+    const subStatusEl = document.getElementById('live-prototype-substatus');
+    if (subStatusEl) {
+      if (rec.recommendation === 'PASS') {
+        subStatusEl.hidden = false;
+        subStatusEl.textContent =
+          `Current bid $${currentBid} · above Draft Pilot's $${yourMax} maximum.`;
+      } else if (rec.recommendation === 'CAUTION') {
+        const room = Math.max(0, rec.recommendedMax - currentBid);
+        subStatusEl.hidden = false;
+        subStatusEl.textContent = room === 0
+          ? `Current bid $${currentBid} · at Draft Pilot's $${yourMax} maximum.`
+          : `Current bid $${currentBid} · $${room} of bidding room remaining.`;
+      } else {
+        subStatusEl.hidden = true;
+        subStatusEl.textContent = '';
+      }
+    }
+
+    // --- Roster context (moved directly under BID TO $X per spec). ---
+    const reasonEl = document.getElementById('live-prototype-reason');
+    if (rec.primaryReason) {
+      reasonEl.hidden = false;
+      reasonEl.textContent = rec.primaryReason;
+    } else {
+      reasonEl.hidden = true;
+      reasonEl.textContent = '';
+    }
+
+    // --- Mirror production sub-sections. These read the DOM state
+    // that renderComposedContext / renderComposedCompetition /
+    // renderAlternatives / renderDetailsPanel already produced --
+    // so the prototype shows THE SAME dynamic values with zero
+    // duplicated calculation logic. ---
+    mirrorProductionIntoPrototype(nom);
+
+    // --- Price meter. Four VISUAL zones are always exactly 25% wide
+    // (VALUE / FAIR / STRETCH / TOO HIGH). The current-bid marker
+    // interpolates WITHIN the correct zone based on the actual dollar
+    // relationship; the max-bid marker always sits at 75%, the
+    // stretch / too-high boundary. This gives every player the same
+    // "price thermometer" while the markers speak the real numbers. ---
+    const meterEl = document.getElementById('live-prototype-meter');
+    const trackEl = document.getElementById('live-prototype-track');
+
+    // Canonical classifier -- the ONLY place price → zone is decided.
+    // Deterministic boundary convention: lower bound inclusive, upper
+    // bound exclusive, so a single price maps to exactly one zone.
+    //
+    //   price < fvLow                       -> value    (GREAT)
+    //   fvLow  <= price < fvHigh            -> fair     (GOOD)
+    //   fvHigh <= price < yourMax           -> stretch  (FAIR)
+    //   price >= yourMax                    -> toohigh  (POOR)
+    //
+    // Consequences that make the boundaries unambiguous:
+    //   $fvLow    -> GOOD (never GREAT)
+    //   $fvHigh   -> FAIR (never GOOD)
+    //   $yourMax  -> POOR (never FAIR)
+    //
+    // Both the marker tint and the marker position derive from this
+    // function so they can never disagree about which zone a price
+    // belongs to.
+    function classify(v) {
+      if (v >= yourMax) return 'toohigh';
+      if (v >= fvHigh)  return 'stretch';
+      if (v >= fvLow)   return 'fair';
+      return 'value';
+    }
+
+    // Piecewise interpolation from a dollar value to a 0-100 position
+    // across the fixed four-zone meter. Uses the SAME boundary
+    // convention as classify() so a boundary value's marker lands at
+    // the boundary line AND is tinted by its owning (upper) zone.
+    function markerPct(v) {
+      if (v <= 0) return 0;
+      const cat = classify(v);
+      if (cat === 'toohigh') {
+        // Overshoot cap = the size of the roster-adjusted stretch
+        // band, so a small overpay reads as a small step into red
+        // rather than pinning to the edge. At v == yourMax the
+        // marker sits exactly on the 75% boundary line, tinted POOR.
+        const stretchSpan = Math.max(1, yourMax - fvHigh);
+        const overshootCap = Math.max(stretchSpan, Math.round(yourMax * 0.15));
+        const over = Math.min(1, (v - yourMax) / overshootCap);
+        return 75 + over * 25;
+      }
+      if (cat === 'stretch') {
+        const span = Math.max(1, yourMax - fvHigh);
+        return 50 + ((v - fvHigh) / span) * 25;
+      }
+      if (cat === 'fair') {
+        const span = Math.max(1, fvHigh - fvLow);
+        return 25 + ((v - fvLow) / span) * 25;
+      }
+      // 'value' -- bid below fair-low. Interp from $0 to fvLow.
+      return Math.max(0, (v / Math.max(1, fvLow)) * 25);
+    }
+
+    const currentPct = Math.max(0, Math.min(100, markerPct(currentBid)));
+    // Max-bid marker is the STRETCH/TOO-HIGH boundary by definition
+    // in this fixed layout -- always 75%.
+    const maxPct = 75;
+    trackEl.style.setProperty('--current-pos', currentPct + '%');
+    trackEl.style.setProperty('--max-pos', maxPct + '%');
+
+    // Current-bid marker tone and the aria label both read the SAME
+    // canonical classification -- no local re-derivation.
+    const zone = classify(currentBid);
+    trackEl.dataset.currentZone = zone;
+    // Max-bid marker is $yourMax, which by the classifier is 'toohigh'
+    // (POOR). Expose it so any styling that wants to tint the max
+    // marker or its threshold label reads from the same source.
+    trackEl.dataset.maxZone = 'toohigh';
+
+    // Threshold labels beneath the internal zone boundaries at fixed
+    // 25% / 50% / 75% positions -- annotations, not an x-axis. Values
+    // come straight from the recommendation engine (fvLow, fvHigh,
+    // yourMax); no zone label sits at 0% or 100% by design.
+    const lowLabel = document.getElementById('live-prototype-threshold-low');
+    const highLabel = document.getElementById('live-prototype-threshold-high');
+    const maxLabelEl = document.getElementById('live-prototype-threshold-max');
+    if (lowLabel) lowLabel.textContent = `$${fvLow}`;
+    if (highLabel) highLabel.textContent = `$${fvHigh}`;
+    if (maxLabelEl) maxLabelEl.textContent = `$${yourMax}`;
+
+    const curLabel = document.getElementById('live-prototype-label-current');
+    curLabel.innerHTML = `<span class="live-prototype-label-kicker">Current</span><span class="live-prototype-label-value">$${currentBid}</span>`;
+    // Clamp label so the translateX(-50%) center never slides past
+    // the meter edges even when the marker pins at 0% or 100%.
+    const labelClamp = Math.max(4, Math.min(96, currentPct));
+    curLabel.style.setProperty('--label-pos', labelClamp + '%');
+    curLabel.dataset.zone = zone;
+
+    // Sensible ARIA text so the meter reads coherently to a screen reader.
+    trackEl.setAttribute('aria-label',
+      `Current bid $${currentBid}. Fair value $${fvLow} to $${fvHigh}. Max bid $${yourMax}. Zone: ${zone}.`
+    );
+
+    meterEl.hidden = false;
+  }
+
+  /**
+   * PROTOTYPE mirror. Copies the rendered state of the production
+   * card's sub-sections into the prototype so both cards show the
+   * same nominator / context / competition / alternatives / details.
+   * No engine calls; no copy generation; just DOM mirroring.
+   */
+  function mirrorProductionIntoPrototype(nom) {
+    // --- Nominator line ("Nominated by X"). Rebuild from source
+    // (nom.openingBidder) rather than cloning DOM so cloned IDs
+    // don't collide with production. ---
+    const protoNom = document.getElementById('live-prototype-nominator');
+    if (protoNom) {
+      protoNom.innerHTML = '';
+      if (nom && nom.openingBidder) {
+        protoNom.hidden = false;
+        protoNom.innerHTML =
+          '<svg class="live-nomination-nominator-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+          + '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>'
+          + '<circle cx="12" cy="7" r="4"/>'
+          + '</svg>';
+        protoNom.appendChild(document.createTextNode('Nominated by '));
+        const who = document.createElement('strong');
+        who.textContent = nom.openingBidder;
+        protoNom.appendChild(who);
+      } else {
+        protoNom.hidden = true;
+      }
+    }
+
+    // --- Composed context sentence. Mirror text + severity class
+    // that renderComposedContext already wrote onto the production
+    // node just moments ago in the same tick. ---
+    const srcContext = document.getElementById('live-context');
+    const dstContext = document.getElementById('live-prototype-context');
+    const dstContextText = document.getElementById('live-prototype-context-text');
+    if (srcContext && dstContext && dstContextText) {
+      dstContext.hidden = srcContext.hidden;
+      // Copy severity classes (is-calm / is-warn / is-alert).
+      const toneClass = ['is-calm', 'is-warn', 'is-alert']
+        .find((c) => srcContext.classList.contains(c)) || '';
+      dstContext.className = 'live-context' + (toneClass ? ' ' + toneClass : '');
+      const srcText = document.getElementById('live-context-text');
+      dstContextText.textContent = srcText ? srcText.textContent : '';
+    }
+
+    // --- Composed competition sentence (with biggest-threat clause). ---
+    const srcComp = document.getElementById('live-competition');
+    const dstComp = document.getElementById('live-prototype-competition');
+    const dstCompText = document.getElementById('live-prototype-competition-text');
+    if (srcComp && dstComp && dstCompText) {
+      dstComp.hidden = srcComp.hidden;
+      const srcCompText = document.getElementById('live-competition-text');
+      dstCompText.textContent = srcCompText ? srcCompText.textContent : '';
+    }
+
+    // --- Alternatives ("If you pass"). Clone the fully-rendered
+    // block from production; wire the cloned "See all" button to
+    // forward its click into the production button (which owns the
+    // toggle state) then re-clone so the prototype re-renders in
+    // sync. Zero duplicated toggle logic.
+    syncAlternativesClone();
+
+    // --- Why this recommendation? (native <details> element -- its
+    // expand/collapse works standalone once cloned, no JS wiring). ---
+    const srcDetails = document.getElementById('live-nomination-details');
+    const dstDetailsMount = document.getElementById('live-prototype-details-mount');
+    if (srcDetails && dstDetailsMount) {
+      dstDetailsMount.innerHTML = '';
+      if (!srcDetails.hidden) {
+        const clone = srcDetails.cloneNode(true);
+        stripIds(clone);
+        clone.open = false;
+        dstDetailsMount.appendChild(clone);
+      }
+    }
+  }
+
+  /**
+   * Recursively remove `id` attributes so a cloned DOM subtree
+   * can be inserted into the same document without duplicating IDs.
+   */
+  function stripIds(root) {
+    if (!root || root.nodeType !== 1) return;
+    if (root.hasAttribute && root.hasAttribute('id')) root.removeAttribute('id');
+    for (let i = 0; i < root.children.length; i++) stripIds(root.children[i]);
+  }
+
+  /**
+   * Re-clone the production alternatives block into the prototype
+   * mount and wire the cloned "See all / Show less" button to
+   * forward its click into the production button. The production
+   * click handler owns the toggle state (`_alternativesExpanded`)
+   * and calls `renderAlternatives`, which repaints production DOM.
+   * We then re-run this same helper to pick up the new state so
+   * the prototype stays in sync in the same tick.
+   */
+  function syncAlternativesClone() {
+    const srcAlts = document.getElementById('live-nomination-alternatives');
+    const dstAltsMount = document.getElementById('live-prototype-alternatives-mount');
+    if (!srcAlts || !dstAltsMount) return;
+    dstAltsMount.innerHTML = '';
+    if (srcAlts.hidden) return;
+    const clone = srcAlts.cloneNode(true);
+    stripIds(clone);
+    const srcSeeAll = document.getElementById('live-alternatives-see-all');
+    const clonedSeeAll = clone.querySelector('.live-alternatives-see-all');
+    if (clonedSeeAll && srcSeeAll && !srcSeeAll.hidden) {
+      clonedSeeAll.addEventListener('click', (e) => {
+        e.preventDefault();
+        srcSeeAll.click(); // production toggle owns the state
+        syncAlternativesClone(); // repaint prototype from fresh DOM
+      });
+    } else if (clonedSeeAll) {
+      clonedSeeAll.hidden = true;
+    }
+    dstAltsMount.appendChild(clone);
   }
 
   /**
@@ -1842,65 +2813,41 @@
    * summarize: fit, scarcity, cliff, pass consequence, full
    * alternatives, per-lift dollar contributions.
    */
-  function renderMaxBidDetails(rec, insights) {
+  function renderMaxBidDetails(rec, insights, position) {
     liveDetailsBody.innerHTML = '';
 
-    // Primary reason lead paragraph -- restates the card's one-line
-    // reason so the details panel can be understood standalone.
-    if (rec.primaryReason) {
-      const lead = document.createElement('p');
-      lead.className = 'live-details-lead';
-      lead.textContent = rec.primaryReason;
-      liveDetailsBody.appendChild(lead);
-    }
+    const pos = (position || '').toUpperCase() || null;
+    const yourMax = Math.max(1, Math.round(rec.recommendedMax));
+    const currentBid = Math.max(0, Math.round(rec.currentBid || 0));
 
-    // The engine's own breakdown -- plain-language rows in dollars.
-    if (Array.isArray(rec.breakdown) && rec.breakdown.length) {
-      const wrap = document.createElement('div');
-      wrap.className = 'live-details-row live-details-row-block';
-      const dt = document.createElement('div');
-      dt.className = 'live-details-label';
-      dt.textContent = 'Breakdown';
-      wrap.appendChild(dt);
-      const dl = document.createElement('dl');
-      dl.className = 'live-details-breakdown';
-      for (const [label, value] of rec.breakdown) {
-        const rowDt = document.createElement('dt');
-        rowDt.textContent = label;
-        const rowDd = document.createElement('dd');
-        rowDd.textContent = value;
-        dl.appendChild(rowDt);
-        dl.appendChild(rowDd);
-      }
-      wrap.appendChild(dl);
-      liveDetailsBody.appendChild(wrap);
+    // Dynamic H4 lead -- restates the action so the panel reads
+    // standalone. "Why bid to $45?" / "Why bid up to $32?" / "Why pass?"
+    const lead = document.createElement('p');
+    lead.className = 'live-details-lead live-details-why-heading';
+    if (rec.recommendation === 'PASS') {
+      lead.textContent = 'Why pass?';
+    } else if (rec.recommendation === 'CAUTION') {
+      lead.textContent = `Why bid up to $${yourMax}?`;
+    } else {
+      lead.textContent = `Why bid to $${yourMax}?`;
     }
+    liveDetailsBody.appendChild(lead);
 
-    // Alternatives -- distinct list-shaped view; keep it in the panel.
-    const altList = insights && insights.alternatives && insights.alternatives.candidates;
-    if (altList && altList.length) {
-      const wrap = document.createElement('div');
-      wrap.className = 'live-details-row live-details-row-block';
-      const dt = document.createElement('div');
-      dt.className = 'live-details-label';
-      dt.textContent = 'Comparable players remaining';
-      wrap.appendChild(dt);
+    // Rank plain-language reasons by contribution (dollar magnitude
+    // when the engine exposes one; heuristic weight otherwise).
+    const reasons = buildWhyReasons(rec, insights, pos, yourMax, currentBid);
+    if (reasons.length) {
       const ul = document.createElement('ul');
-      ul.className = 'live-details-alt-list';
-      altList.forEach((c) => {
+      ul.className = 'live-details-why-list';
+      reasons.slice(0, 5).forEach((r) => {
         const li = document.createElement('li');
-        const av = c.auctionContext && c.auctionContext.alternativeValue;
-        const bits = [c.name];
-        if (av != null) bits.push(`$${av}`);
-        li.textContent = bits.join(' · ');
+        li.textContent = r.text;
         ul.appendChild(li);
       });
-      wrap.appendChild(ul);
-      liveDetailsBody.appendChild(wrap);
+      liveDetailsBody.appendChild(ul);
     }
 
-    // Confidence footnote -- only shown when we're operating on
-    // partial data. Helps a manager know when to trust the number.
+    // Confidence footnote -- only shown when operating on partial data.
     if (rec.confidence && rec.confidence !== 'high') {
       const note = document.createElement('p');
       note.className = 'live-details-lead';
@@ -1913,8 +2860,178 @@
 
     liveNominationDetails.hidden = false;
     if (liveNominationDetailsSummary) {
-      liveNominationDetailsSummary.textContent = 'Why?';
+      const _txt = document.getElementById('live-nomination-details-summary-text');
+      if (_txt) _txt.textContent = 'Why this recommendation?';
     }
+  }
+
+  /**
+   * Compose the ranked "why" bullet list from the same signals that
+   * drove the recommendation. Each reason carries a weight so the top
+   * 3-5 contributors bubble up; the rest are dropped. Copy stays in
+   * plain language -- no jargon, no percentages, no raw component names.
+   */
+  function buildWhyReasons(rec, insights, pos, yourMax, currentBid) {
+    const out = [];
+    const posLabel = pos || 'player';
+    const isPass = rec.recommendation === 'PASS';
+
+    // --- Roster need. Slot fill dominates when we have it. ---
+    const need = rec.rosterNeed || {};
+    const slot = need.fillsSlot && need.fillsSlot !== 'BN'
+      ? String(need.fillsSlot).replace(/_/g, ' ')
+      : null;
+    if (need.tone === 'high') {
+      out.push({
+        weight: 100,
+        text: slot
+          ? `You need a starting ${slot}.`
+          : `You need another starter at ${posLabel}.`,
+      });
+    } else if (need.tone === 'moderate') {
+      out.push({
+        weight: 55,
+        text: slot
+          ? `This would upgrade your ${slot}.`
+          : `This upgrades your ${posLabel} lineup.`,
+      });
+    } else if (need.tone === 'low') {
+      out.push({
+        weight: 30,
+        text: `You already have starters at ${posLabel} — this is depth.`,
+      });
+    } else if (need.tone === 'none') {
+      out.push({
+        weight: 25,
+        text: `No lineup upgrade at ${posLabel} — bench only.`,
+      });
+    }
+
+    // --- Positional scarcity. Prefer the concrete "N comparable
+    // remain" count from insights; fall back to the qualitative level. ---
+    const scar = (insights && insights.scarcity) || {};
+    const scarDollars = Math.abs((rec.scarcity && rec.scarcity.dollars) || 0);
+    const compLeft = scar.comparableRemaining != null
+      ? scar.comparableRemaining
+      : (scar.atOrAboveRemaining != null ? scar.atOrAboveRemaining : null);
+    if (compLeft != null) {
+      if (compLeft === 0) {
+        out.push({ weight: 90, text: `No comparable ${posLabel}s left after this player.` });
+      } else if (compLeft <= 5) {
+        out.push({ weight: 70 + scarDollars, text: `Only ${compLeft} comparable ${posLabel}s remain.` });
+      } else if (compLeft <= 12) {
+        out.push({ weight: 30 + scarDollars, text: `${compLeft} comparable ${posLabel}s remain.` });
+      } else {
+        out.push({ weight: 10, text: `Plenty of comparable ${posLabel}s still on the board.` });
+      }
+    } else if (rec.scarcity && rec.scarcity.level) {
+      const lv = rec.scarcity.level;
+      if (lv === 'CRITICAL' || lv === 'HIGH') {
+        out.push({ weight: 65, text: `Few ${posLabel}s of this caliber left.` });
+      } else if (lv === 'MEDIUM') {
+        out.push({ weight: 25, text: `${posLabel} depth is thinning.` });
+      }
+    }
+
+    // --- Value cliff -- only when severe and not already implied by
+    // the scarcity line. ---
+    const cliff = (insights && insights.cliff) || {};
+    if (cliff.hasCliff && cliff.isSevere && cliff.dropoffPct != null) {
+      const pct = Math.round(cliff.dropoffPct * 100);
+      out.push({
+        weight: 55 + pct,
+        text: cliff.nextComparableProjection == null
+          ? `No comparable ${posLabel} left after this one.`
+          : `Big production drop after this ${posLabel} — next best is ~${pct}% worse.`,
+      });
+    }
+
+    // --- Competition -- rival demand for the same position. ---
+    const comp = rec.competition || {};
+    if (comp.seriousBidders >= 3) {
+      out.push({
+        weight: 20 + comp.seriousBidders * 5,
+        text: `${comp.seriousBidders} teams still need ${posLabel} help and can afford this.`,
+      });
+    } else if (comp.seriousBidders === 0 && !isPass) {
+      out.push({ weight: 20, text: `No other team is set up to push the price.` });
+    }
+
+    // --- Alternatives -- price range of realistic backups. Skip when
+    // we only have one comparable to quote (a single price isn't a range). ---
+    const altCandidates = (insights && insights.alternatives && insights.alternatives.candidates) || [];
+    const altValues = altCandidates
+      .map((c) => c.auctionContext && c.auctionContext.alternativeValue)
+      .filter((v) => typeof v === 'number' && v > 0);
+    if (altValues.length >= 2) {
+      const lo = Math.min(...altValues);
+      const hi = Math.max(...altValues);
+      out.push({
+        weight: 40,
+        text: lo === hi
+          ? `Your strongest alternatives are around $${lo}.`
+          : `Your strongest alternatives are $${lo}–$${hi}.`,
+      });
+    } else if (rec.replacementDepth === 'weak') {
+      out.push({ weight: 45, text: `Few realistic alternatives remain at ${posLabel}.` });
+    }
+
+    // --- Budget pressure / opportunity cost. Only surface when it
+    // materially shaped the max (dollarsCut > 0 or high tone). ---
+    const opp = rec.opportunityCost || {};
+    const budget = rec.budgetPressure || {};
+    const oppCut = Math.abs(opp.dollarsCut || 0);
+    if (opp.tone === 'high' || oppCut >= 3) {
+      out.push({
+        weight: 25 + oppCut,
+        text: `Spending here squeezes your other open slots.`,
+      });
+    } else if (budget.remainingBudget != null && budget.openSlots > 0 && !isPass) {
+      const leftAfter = budget.remainingBudget - yourMax;
+      if (leftAfter >= 0 && leftAfter <= budget.openSlots * 2 + 2) {
+        out.push({
+          weight: 22,
+          text: `That leaves roughly $${Math.max(0, leftAfter)} for your remaining ${budget.openSlots} slots.`,
+        });
+      }
+    }
+
+    // --- Max vs fair-value framing. Not a driver on its own, but a
+    // useful last line so the manager understands the number. ---
+    const fvr = rec.fairValueRange || {};
+    if (fvr.low != null && fvr.high != null) {
+      if (isPass) {
+        const over = Math.max(1, currentBid - yourMax);
+        out.push({
+          weight: 95,
+          text: `$${currentBid} is $${over} over your recommended max of $${yourMax}.`,
+        });
+      } else if (yourMax > fvr.high) {
+        out.push({
+          weight: 15,
+          text: `$${yourMax} is above fair value ($${fvr.low}–$${fvr.high}), but reasonable for your roster.`,
+        });
+      } else if (yourMax < fvr.low) {
+        out.push({
+          weight: 15,
+          text: `$${yourMax} sits below fair value ($${fvr.low}–$${fvr.high}) — no need to overpay.`,
+        });
+      } else {
+        out.push({
+          weight: 10,
+          text: `$${yourMax} sits inside fair value ($${fvr.low}–$${fvr.high}).`,
+        });
+      }
+    }
+
+    // Rank by contribution (highest first) and de-dup on exact copy.
+    out.sort((a, b) => b.weight - a.weight);
+    const seen = new Set();
+    return out.filter((r) => {
+      if (seen.has(r.text)) return false;
+      seen.add(r.text);
+      return true;
+    });
   }
 
   function renderDetailsPanel(ctx) {
@@ -1928,7 +3045,7 @@
     // legacy sections below would double up. Alternatives stay as the
     // one extra list because they're a distinct list-shaped view.
     if (rec && rec.engine === 'bidEngine') {
-      renderMaxBidDetails(rec, insights);
+      renderMaxBidDetails(rec, insights, position);
       return;
     }
 
@@ -2041,7 +3158,8 @@
 
     liveNominationDetails.hidden = !hasAny;
     if (liveNominationDetailsSummary) {
-      liveNominationDetailsSummary.textContent = 'Details';
+      const _txt2 = document.getElementById('live-nomination-details-summary-text');
+      if (_txt2) _txt2.textContent = 'Why this recommendation?';
     }
   }
 
@@ -2220,18 +3338,86 @@
   }
 
   /**
-   * Alternatives section: top 3-5 replacement candidates for the
+   * Two-clause context sentence under each "If you pass" row. Reads
+   * from fields already computed by the Alternative Score engine
+   * (componentScores.production, auctionContext.priceAdvantage /
+   * valueDifference) -- no additional math, no changes to the
+   * underlying score.
+   *
+   *   Clause 1 -- production relation ("Similar production" /
+   *               "Small production drop" / "Larger production drop").
+   *   Clause 2 -- cost relation vs. the nominee ("Strong fallback"
+   *               when parity or nearly so, otherwise cheaper/pricier).
+   */
+  function buildAlternativeContext(c) {
+    if (!c) return '';
+    const cs = (c.componentScores) || {};
+    const auction = c.auctionContext || {};
+    const prodScore = typeof cs.production === 'number' ? cs.production : null;
+    const altScore = typeof c.alternativeScore === 'number' ? c.alternativeScore : null;
+
+    // Production relation clause.
+    let prodClause;
+    if (prodScore == null) {
+      prodClause = altScore != null && altScore >= 80
+        ? 'Comparable value'
+        : 'Reasonable fallback';
+    } else if (prodScore >= 92) {
+      prodClause = 'Similar production';
+    } else if (prodScore >= 78) {
+      prodClause = 'Small production drop';
+    } else if (prodScore >= 60) {
+      prodClause = 'Noticeable production drop';
+    } else {
+      prodClause = 'Larger production drop';
+    }
+
+    // Cost / usefulness clause. Uses priceAdvantage when available,
+    // otherwise falls back to a strength verdict from alternativeScore.
+    let costClause = '';
+    const adv = auction.priceAdvantage;
+    const diff = auction.valueDifference;
+    if (adv === 'cheaper' && typeof diff === 'number' && diff > 1) {
+      costClause = `Cheaper by $${Math.round(diff)}`;
+    } else if (adv === 'more_expensive' && typeof diff === 'number' && diff < -1) {
+      costClause = `Costs $${Math.abs(Math.round(diff))} more`;
+    } else if (adv === 'even' || adv === 'cheaper' || adv === 'more_expensive') {
+      costClause = 'Similar cost';
+    } else if (altScore != null) {
+      costClause = altScore >= 80 ? 'Strong fallback'
+        : altScore >= 60 ? 'Reasonable fallback'
+        : 'Weaker fallback';
+    }
+
+    return costClause ? `${prodClause} · ${costClause}` : prodClause;
+  }
+
+  /**
+   * "If you pass" section: top realistic replacement paths for the
    * nominated player, ranked by Alternative Score (production-dominant,
-   * scarcity/consistency/playoff/rosterFit as configured). Auction
-   * price is surfaced as a secondary column so the delta is obvious
-   * without inflating the score.
+   * scarcity / consistency / playoff / rosterFit as configured). Auction
+   * price is surfaced as the prominent right-side value so the trade-off
+   * (production drop vs. cost saving) is obvious in one read.
    *
    * Reads only from insights.alternatives; no math here (spec §20).
    */
   function renderAlternatives(alt, nom, ctx) {
     if (!liveAlternatives) return;
     ctx = ctx || {};
-    void nom; void ctx;
+
+    // Reset the expand/collapse state whenever the nominated player
+    // changes -- "See all" on the previous player should not carry
+    // over to a fresh nomination.
+    const nomKey = (nom && (nom.playerId || nom.playerKey || nom.playerName)) || '';
+    if (nomKey !== _alternativesNomKey) {
+      _alternativesExpanded = false;
+      _alternativesNomKey = nomKey;
+    }
+
+    // Cache inputs so the button's click handler can re-render with
+    // the same data on toggle without needing another poll tick.
+    _lastAlternatives = alt;
+    _lastAlternativesCtx = { nom: nom, ctx: ctx };
 
     if (!alt) { liveAlternatives.hidden = true; return; }
     const hasCandidates = Array.isArray(alt.candidates) && alt.candidates.length > 0;
@@ -2257,52 +3443,72 @@
     // Compact default view: top 2 candidates only. Each row is
     // "Name — $value · <short label>". No percentages, no deltas,
     // no methodology — those live inside the Details panel below.
+    // Expanded view (after "See all" is clicked) renders every
+    // candidate inline; collapsing goes back to the top 2.
     const TOP_N = 2;
-    alt.candidates.slice(0, TOP_N).forEach((c) => {
+    const isExpanded = !!_alternativesExpanded;
+
+    const paintRow = (c) => {
       const li = document.createElement('li');
       li.className = 'live-alternatives-row';
 
+      const top = document.createElement('div');
+      top.className = 'live-alternatives-row-top';
       const name = document.createElement('span');
       name.className = 'live-alternatives-name';
       name.textContent = c.name;
-      li.appendChild(name);
+      top.appendChild(name);
 
       const av = c.auctionContext && c.auctionContext.alternativeValue;
       if (av != null) {
         const valEl = document.createElement('span');
         valEl.className = 'live-alternatives-value';
         valEl.textContent = `$${av}`;
-        li.appendChild(valEl);
+        top.appendChild(valEl);
+      }
+      li.appendChild(top);
+
+      const ctxText = buildAlternativeContext(c);
+      if (ctxText) {
+        const sub = document.createElement('div');
+        sub.className = 'live-alternatives-context';
+        sub.textContent = ctxText;
+        li.appendChild(sub);
       }
 
-      const label = document.createElement('span');
-      label.className = 'live-alternatives-label-inline';
-      // Simple qualitative label instead of a numeric score. Threshold
-      // matches the engine's own "strong" cutoff (~70).
-      label.textContent = (c.alternativeScore != null && c.alternativeScore >= 70)
-        ? 'Strong'
-        : 'Similar';
-      li.appendChild(label);
-
       liveAlternativesList.appendChild(li);
-    });
+    };
 
-    // "See all alternatives" footer — only when there's more to see.
-    if (alt.candidates.length > TOP_N) {
-      const more = document.createElement('li');
-      more.className = 'live-alternatives-more';
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'link-btn';
-      btn.textContent = `See all ${alt.candidates.length} alternatives`;
-      btn.addEventListener('click', () => {
-        if (liveNominationDetails) {
-          liveNominationDetails.open = true;
-          liveNominationDetails.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    const rowsToShow = isExpanded ? alt.candidates : alt.candidates.slice(0, TOP_N);
+    rowsToShow.forEach(paintRow);
+
+    // "See all N" (collapsed) <-> "Show less" (expanded) toggle in the
+    // header. Cached candidates + expanded flag let re-renders (poll
+    // ticks) preserve the user's choice until the nomination changes.
+    const seeAllBtn = document.getElementById('live-alternatives-see-all');
+    const seeAllTxt = document.getElementById('live-alternatives-see-all-text');
+    if (seeAllBtn && seeAllTxt) {
+      if (alt.candidates.length > TOP_N) {
+        seeAllTxt.textContent = isExpanded
+          ? 'Show less'
+          : `See all ${alt.candidates.length}`;
+        seeAllBtn.hidden = false;
+        if (!seeAllBtn._draftpilotBound) {
+          seeAllBtn.addEventListener('click', () => {
+            _alternativesExpanded = !_alternativesExpanded;
+            if (_lastAlternatives && _lastAlternativesCtx) {
+              renderAlternatives(
+                _lastAlternatives,
+                _lastAlternativesCtx.nom,
+                _lastAlternativesCtx.ctx
+              );
+            }
+          });
+          seeAllBtn._draftpilotBound = true;
         }
-      });
-      more.appendChild(btn);
-      liveAlternativesList.appendChild(more);
+      } else {
+        seeAllBtn.hidden = true;
+      }
     }
   }
 
@@ -2489,6 +3695,14 @@
   // it during a live auction. Meaningful moves ($3+, or a player
   // change) always show through.
   const _maxBidSmoothing = { key: null, lastMax: null };
+
+  // Alternatives expand/collapse state. Preserved across poll-driven
+  // re-renders so the "See all" toggle sticks until the nomination
+  // changes; reset in renderAlternatives when nomKey flips.
+  let _alternativesExpanded = false;
+  let _alternativesNomKey = '';
+  let _lastAlternatives = null;
+  let _lastAlternativesCtx = null;
   function smoothMax(key, newMax) {
     if (_maxBidSmoothing.key !== key) {
       _maxBidSmoothing.key = key;
@@ -2518,33 +3732,99 @@
       : rec.recommendation === 'CAUTION' ? 'is-caution' : 'is-pass';
     liveNominationRec.className = 'live-nomination-rec has-yourmax ' + cls;
 
-    // Headline: the decision + your max together. Big number is the
-    // strategic ceiling, not "value" -- managers optimise a roster,
-    // not a price index.
-    let headline;
+    // Headline: one component, three semantic states, all built from
+    // the same verb + amount pair so the scan pattern is consistent:
+    //
+    //   BUY      -> "BID TO $45"      (comfortable ceiling)
+    //   CAUTION  -> "BID TO $40"      (approaching ceiling; sub-status
+    //                                  flags the urgency)
+    //   PASS     -> "PASS"            (no amount; sub-status explains
+    //                                  why bidding further is off)
+    //
+    // The tri-state color coding (is-buy/caution/pass) plus the
+    // sub-status line carry the "keep going / slow down / stop"
+    // distinction -- never color alone.
+    liveNominationRecHeadline.textContent = '';
+    const verbEl = document.createElement('span');
+    verbEl.className = 'live-nomination-rec-verb';
     if (rec.recommendation === 'PASS') {
-      const over = Math.max(1, currentBid - yourMax);
-      headline = `PASS · $${over} over`;
-    } else if (rec.recommendation === 'CAUTION') {
-      headline = `CAUTION · max $${yourMax}`;
+      verbEl.textContent = 'PASS';
+      liveNominationRecHeadline.appendChild(verbEl);
     } else {
-      headline = `BUY to $${yourMax}`;
+      verbEl.textContent = 'BID TO';
+      const amountEl = document.createElement('span');
+      amountEl.className = 'live-nomination-rec-amount';
+      amountEl.textContent = `$${yourMax}`;
+      liveNominationRecHeadline.appendChild(verbEl);
+      liveNominationRecHeadline.appendChild(document.createTextNode(' '));
+      liveNominationRecHeadline.appendChild(amountEl);
     }
-    liveNominationRecHeadline.textContent = headline;
 
-    // Sub-line: fair value, current bid, remaining room, then the
-    // one-line reason. All plain-language, no percentages.
-    const parts = [];
-    parts.push(`Fair <b>$${rec.fairValue}</b>`);
-    parts.push(`Bid <b>$${currentBid}</b>`);
-    if (rec.recommendation === 'PASS') {
-      parts.push(`<b>$${Math.abs(remaining)} over</b>`);
-    } else if (remaining > 0) {
-      parts.push(`<b>$${remaining}</b> room`);
+    // State-aware sub-status. Surfaces ONLY when there's urgency to
+    // communicate -- keeps the BUY state clean and lets CAUTION/PASS
+    // speak the "why the action changed" beat in plain language.
+    let subStatus = document.getElementById('live-nomination-rec-substatus');
+    if (!subStatus) {
+      subStatus = document.createElement('p');
+      subStatus.id = 'live-nomination-rec-substatus';
+      subStatus.className = 'live-nomination-rec-substatus';
+      liveNominationRecHeadline.parentNode.insertBefore(
+        subStatus, liveNominationRecHeadline.nextSibling
+      );
     }
-    liveNominationRecRange.hidden = false;
-    liveNominationRecRange.innerHTML = parts.join(' · ')
-      + (rec.primaryReason ? ` <span class="live-nomination-rec-reason">— ${escapeHtml(rec.primaryReason)}</span>` : '');
+    if (rec.recommendation === 'PASS') {
+      subStatus.hidden = false;
+      subStatus.textContent =
+        `Current bid $${currentBid} · above Draft Pilot's $${yourMax} maximum.`;
+    } else if (rec.recommendation === 'CAUTION') {
+      const room = Math.max(0, remaining);
+      subStatus.hidden = false;
+      subStatus.textContent = room === 0
+        ? `Current bid $${currentBid} · at Draft Pilot's $${yourMax} maximum.`
+        : `Current bid $${currentBid} · $${room} of bidding room remaining.`;
+    } else {
+      subStatus.hidden = true;
+      subStatus.textContent = '';
+    }
+
+    // Plain-language reason as its own line under the headline, then a
+    // 3-column mini-grid summarising the numbers. Grid replaces the
+    // older prose "Fair $X · Bid $Y · $Z room" strip so the values are
+    // scannable at a glance. The legacy prose range is hidden.
+    const reasonEl = document.getElementById('live-nomination-rec-reason');
+    if (reasonEl) {
+      if (rec.primaryReason) {
+        reasonEl.hidden = false;
+        reasonEl.textContent = rec.primaryReason;
+      } else {
+        reasonEl.hidden = true;
+        reasonEl.textContent = '';
+      }
+    }
+
+    const metricsEl = document.getElementById('live-nomination-rec-metrics');
+    const fairEl = document.getElementById('live-nomination-metric-fair');
+    const bidEl = document.getElementById('live-nomination-metric-bid');
+    const roomEl = document.getElementById('live-nomination-metric-room');
+    if (metricsEl && fairEl && bidEl && roomEl) {
+      metricsEl.hidden = false;
+      // Render the fair-value RANGE ("$32–36") rather than a false-
+      // precision scalar ("$34"). Collapses to the scalar when the
+      // range degenerated to a single point (no tierAggregates path).
+      fairEl.textContent = formatFairValue(rec);
+      bidEl.textContent = `$${currentBid}`;
+      if (rec.recommendation === 'PASS') {
+        roomEl.textContent = `-$${Math.abs(remaining)}`;
+        roomEl.className = 'live-nomination-metric-value is-negative';
+      } else {
+        roomEl.textContent = `+$${Math.max(0, remaining)}`;
+        roomEl.className = 'live-nomination-metric-value'
+          + (remaining > 0 ? ' is-positive' : '');
+      }
+    }
+
+    liveNominationRecRange.hidden = true;
+    liveNominationRecRange.innerHTML = '';
 
     // Legacy standalone fit / why / competition nodes stay hidden.
     if (liveNominationFit) liveNominationFit.hidden = true;
@@ -2558,6 +3838,20 @@
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  // Fair value renders as a RANGE (spec §2, §20). Falls back to the
+  // scalar when the range degenerated to a single point (typically
+  // when tierAggregates wasn't available in the pipeline). The
+  // "en-dash" separator (–) is intentional -- typographically
+  // correct for numeric ranges.
+  function formatFairValue(rec) {
+    const r = rec && rec.fairValueRange;
+    if (r && r.low != null && r.high != null && r.low !== r.high) {
+      return `$${r.low}–${r.high}`;
+    }
+    const scalar = (r && r.center != null) ? r.center : (rec && rec.fairValue);
+    return `$${scalar != null ? scalar : '?'}`;
   }
 
   function renderRecommendation(rec, ctx) {
@@ -2581,6 +3875,13 @@
       (rec.action === 'pass' ? ' is-pass' :
        rec.action === 'conditional' ? ' is-conditional' : '');
     liveNominationRecHeadline.textContent = rec.headline;
+
+    // The bidEngine mini-grid / reason line don't apply to the legacy
+    // path — hide them so they don't leak in from a prior render.
+    const _reasonElL = document.getElementById('live-nomination-rec-reason');
+    const _metricsElL = document.getElementById('live-nomination-rec-metrics');
+    if (_reasonElL) { _reasonElL.hidden = true; _reasonElL.textContent = ''; }
+    if (_metricsElL) { _metricsElL.hidden = true; }
 
     if (rec.action === 'pass') {
       liveNominationRecRange.hidden = true;

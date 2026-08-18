@@ -1,4 +1,4 @@
-# Draft Pilot (v0.2)
+# Draft Pilot (v0.3)
 
 A browser extension that exports Sleeper Fantasy Football draft data to CSV.
 Two exports today: the currently open draft room's player list (with
@@ -443,8 +443,10 @@ draftpilot/
     popup.html
     popup.css
     popup.js            # orchestrates sync, exports, and Live Draft Mode panels
-                        #   (nomination card + "Recent activity" pick log;
-                        #    team-roster-needs card is currently hidden).
+                        #   (On-the-Block nomination card + Next Nomination
+                        #    recommendation + Available Players live market
+                        #    + "Recent activity" pick log; team-roster-needs
+                        #    card is currently hidden).
                         #   renderNomination paints Rec FIRST, then wraps every
                         #   additive layer (renderScarcityRow, renderPrimary-
                         #   Insight, renderValueCliff, renderPassConsequence,
@@ -543,8 +545,25 @@ draftpilot/
                         #   table + tier-boundary summary),
                         #   scarcity ADAPTER (thin wrapper on the
                         #   analysis engine, preserves legacy fields),
-                        #   bidder profile, nomination suggester, your-team
-                        #   scorecard, bid recommendation adapter
+                        #   bidder profile, legacy burn-potential
+                        #   suggestNominations (retained for revertability;
+                        #   no longer on the hot path),
+                        #   suggestNextNomination — the strategy layer
+                        #   (DRAIN / DISTRACT / TARGET / WAIT) behind the
+                        #   Next Nomination card. Reuses bidderProfile +
+                        #   findTier + computeLeagueAdjustedValueRange; adds
+                        #   baseline-vs-inflated range for marketDeltaPct,
+                        #   and a need-weighted topBidders ranking (two
+                        #   open starter slots outrank a slightly larger
+                        #   budget with one open slot) — no new valuation,
+                        #   no duplicate math,
+                        #   listAvailablePlayers — row model for the
+                        #   Available Players live market (search / position
+                        #   filter / sort / roster-fit chip / marketDeltaPct
+                        #   / drafted-set from pool + picks union), same
+                        #   canonical valuation engine as Next Nomination
+                        #   and On-the-Block,
+                        #   your-team scorecard, bid recommendation adapter
                         #   (computeBidRecommendation — short-circuits to
                         #   bidEngine.computeYourMax when rosterAwareMaxBid
                         #   is on, mapEngineResultToLegacyShape preserves
@@ -721,7 +740,49 @@ Shipped:
       from whichever variant Sleeper's DOM happens to render in a given
       browser, so roster fit and max-bid clamping behave identically in
       Chrome and Firefox.
-- [x] Nomination suggester (rank undrafted players by opponent burn potential)
+- [x] **Next Nomination — strategic recommendation card.** Replaces the
+      old "Suggested Nominations" list. `suggestNextNomination` in
+      `utils/liveDraft.js` returns one primary + up to two secondary
+      candidates tagged **DRAIN** (burn opponents' budgets on a player
+      you can pass on), **DISTRACT** (attract bids away from your real
+      targets), **TARGET** (fits your roster and the market moment),
+      or **WAIT** (nominating now would expose your intent). The card
+      renders a strategy label, player, live `Est. $L–H` range, a
+      plain-English reason, up to three likely bidders with budgets, a
+      `Market ±N%` chip when the live/baseline delta is meaningful
+      (≥8%), and a Nominate action that copies the player name for
+      pasting into Sleeper. Reuses `bidderProfile`,
+      `computeLeagueAdjustedValueRange`, and `findTier` — no parallel
+      valuation math. WAIT hides the action button and keeps the
+      bidders block, since seeing who would push the price is the
+      whole reason to hold. Failsafe: when no strategic nomination
+      surfaces, renders "No clear nomination — hold off until the
+      next player changes the room."
+- [x] **Live auction pricing on every recommendation.** The value range
+      shown on Next Nomination (and the same shape on Available
+      Players) comes from `computeLeagueAdjustedValueRange` under the
+      live inflation factor, with a baseline-inflation pass used only
+      to compute `marketDeltaPct`. Directional movement is expressed
+      as plain text (`Market +12%` / `Market -9%`) with a subtle
+      warning/success color tint; no arrows, no emojis, no false
+      precision. Bidder ranking on the card is need-weighted, not
+      pure budget — a team with two open starter slots at the position
+      correctly outranks a modestly richer team with one open slot.
+- [x] **Available Players — live auction market list.** New card
+      complementing Next Nomination: exploratory, not
+      recommendation-driven. `listAvailablePlayers` in
+      `utils/liveDraft.js` returns filtered / sorted / capped rows
+      (search by name or team, position chips derived from the live
+      pool, sort by live value / biggest market ± / tier / position;
+      `Fits` chip when the player fills a starter slot on your
+      roster). Drafted players fall off automatically via the same
+      `pool.isDrafted ∪ session.picks` union used by Next Nomination.
+      80-row render cap with a "N more match — narrow the filter"
+      hint; hidden until the pool snapshot has been captured, so
+      there is no duplicate "load the pool" CTA next to Next
+      Nomination.
+- [x] Legacy `suggestNominations` (burn-potential ranking) retained as
+      an export for revertability; no longer wired into the UI.
 - [x] Auction inflation calculator — live inflation factor with trend,
       plain-language interpretation, and per-bid actionable advice
 - [x] **Positional Scarcity engine** in `utils/analysis.js` —

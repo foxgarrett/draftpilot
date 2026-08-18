@@ -784,23 +784,104 @@
    * projection or hides the block.
    */
   function computeLeagueAdjustedValue({ position, sleeperProjection, tierAggregates, inflationFactor }) {
+    const range = computeLeagueAdjustedValueRange({ position, sleeperProjection, tierAggregates, inflationFactor });
+    return range ? range.center : null;
+  }
+
+  /**
+   * Range-aware league-adjusted value.
+   *
+   * Returns `{ low, center, high, samples, sourceTier }` -- the fair-
+   * value RANGE for this player, derived from the historical dollar-
+   * tier distribution (not a manufactured ±$X band). Consumers that
+   * want a single number keep calling `computeLeagueAdjustedValue`,
+   * which is a thin wrapper on `.center` here (spec §18: no scalar
+   * consumer breaks).
+   *
+   * How the range is built (spec §3, §5, §19):
+   *   1. Find the closest-median tier for this player's Sleeper $
+   *      projection -- same anchor as the legacy scalar path.
+   *   2. Base range = [tier.min, tier.max] -- REAL distribution of
+   *      per-rank medians across the ranks in the tier.
+   *   3. Multiply endpoints + center by inflation.
+   *   4. Widen for uncertainty:
+   *        - Sleeper $ diverges from tier median by >25% -> +10%
+   *          each side (the projection disagrees with history).
+   *        - tier.samples < 3 -> +10% each side (sparse history).
+   *   5. Clamp: low >= 1 ($1 player edge case); low <= center <= high;
+   *      integer rounding.
+   *
+   * Returns null when we lack the inputs (same conditions as the
+   * legacy scalar function).
+   */
+  function computeLeagueAdjustedValueRange({ position, sleeperProjection, tierAggregates, inflationFactor }) {
     if (!position || sleeperProjection == null || sleeperProjection <= 0) return null;
     const tiers = tierAggregates && tierAggregates[position];
     if (!tiers || !tiers.length) return null;
 
-    // Closest-median tier lookup. Tiers are already ranked (0 = top) so
-    // players with a big Sleeper $ naturally land on high-tier medians.
-    let bestMedian = tiers[0].median;
-    let bestDist = Math.abs(tiers[0].median - sleeperProjection);
-    for (let i = 1; i < tiers.length; i++) {
-      const m = tiers[i].median;
-      if (m == null) continue;
-      const d = Math.abs(m - sleeperProjection);
-      if (d < bestDist) { bestDist = d; bestMedian = m; }
+    // Closest-median tier lookup -- identical to the legacy scalar
+    // path so center == old value for stable back-compat.
+    let bestTier = null;
+    let bestDist = Infinity;
+    for (let i = 0; i < tiers.length; i++) {
+      const t = tiers[i];
+      if (!t || t.median == null) continue;
+      const d = Math.abs(t.median - sleeperProjection);
+      if (d < bestDist) { bestDist = d; bestTier = t; }
     }
+    if (!bestTier) return null;
 
     const factor = inflationFactor > 0 ? inflationFactor : 1;
-    return Math.max(1, Math.round(bestMedian * factor));
+    const medianAdj = bestTier.median * factor;
+
+    // Raw range from the tier's actual price distribution. When a tier
+    // was built from a single per-rank median (samples=1), min==max==
+    // median and the range collapses -- the widening below rescues it.
+    let low = (bestTier.min != null ? bestTier.min : bestTier.median) * factor;
+    let high = (bestTier.max != null ? bestTier.max : bestTier.median) * factor;
+
+    // Widen for uncertainty. Applied MULTIPLICATIVELY so $1 players
+    // widen by cents and $60 players widen by dollars, both feel right.
+    let widen = 0;
+    // Projection disagrees with historical center.
+    if (bestTier.median > 0) {
+      const divergence = Math.abs(sleeperProjection - bestTier.median) / bestTier.median;
+      if (divergence > 0.25) widen += 0.10;
+    }
+    // Sparse historical evidence.
+    const samples = Number(bestTier.samples) || 0;
+    if (samples < 3) widen += 0.10;
+
+    // Also enforce a minimum half-width so a tight-tier player doesn't
+    // read as $34-$34 when the real market has some noise. Baseline:
+    // ±5% of center, min $1 half-width for anything above ~$4.
+    const minHalfWidth = Math.max(1, Math.round(medianAdj * 0.05));
+
+    // Apply widening to the range endpoints, then enforce minimum
+    // half-width and the $1 floor.
+    if (widen > 0) {
+      low = low - medianAdj * widen;
+      high = high + medianAdj * widen;
+    }
+    if (medianAdj - low < minHalfWidth) low = medianAdj - minHalfWidth;
+    if (high - medianAdj < minHalfWidth) high = medianAdj + minHalfWidth;
+
+    // Integer dollars + hard floors. low>=1 catches the $1-player case
+    // (spec §19: no "-$2-$4"). low<=center<=high keeps the invariant
+    // even after rounding.
+    const centerR = Math.max(1, Math.round(medianAdj));
+    let lowR = Math.max(1, Math.round(low));
+    let highR = Math.max(lowR, Math.round(high));
+    if (lowR > centerR) lowR = centerR;
+    if (highR < centerR) highR = centerR;
+
+    return {
+      low: lowR,
+      center: centerR,
+      high: highR,
+      samples,
+      sourceTier: bestTier.tierIndex != null ? bestTier.tierIndex : null,
+    };
   }
 
   // Slot-eligibility map. A player at position P is a legal draft into
@@ -1222,6 +1303,456 @@
   }
 
   // -------------------------------------------------------------------
+  // Next Nomination: strategic recommendation
+  //
+  // Where suggestNominations returns a ranked list of "who's a decent
+  // burn candidate," this returns a small, strategy-labelled set:
+  // one primary recommendation + up to two secondaries, each tagged
+  // DRAIN / DISTRACT / TARGET, or a single WAIT recommendation when
+  // the best-scoring candidate is one the manager should NOT put up.
+  //
+  // Reuses bidderProfile, computeLeagueAdjustedValueRange, and findTier
+  // — no new valuation math. All copy is derived from live state.
+  // -------------------------------------------------------------------
+
+  // Extracts the signal set for every viable nomination candidate.
+  // Independent of any strategy — used by both computeStrategyRecommen-
+  // dations (per-strategy scoring) and suggestNextNomination (legacy
+  // classifier). Returns [] when inputs aren't ready or nobody's
+  // eligible.
+  function _buildNextNomCandidates(opts) {
+    const {
+      pool, completedPicks, teams, tierAggregates,
+      yourManager, yourIdentity, league, inflationFactor,
+    } = opts || {};
+
+    if (!pool || !pool.players || !pool.players.length) return { candidates: [], yourMaxBid: 0 };
+    if (!teams || !teams.length) return { candidates: [], yourMaxBid: 0 };
+
+    const drafted = new Set();
+    for (const p of pool.players) {
+      if (p.isDrafted) drafted.add(poolKey(p.name, p.position));
+    }
+    for (const pick of completedPicks || []) {
+      const md = pick && pick.metadata;
+      if (!md) continue;
+      const name = `${md.first_name || ''} ${md.last_name || ''}`.trim();
+      if (name && md.position) drafted.add(poolKey(name, md.position));
+    }
+
+    let you = null;
+    if (yourIdentity && (yourIdentity.userId || yourIdentity.username)) {
+      you = resolveYourTeam(teams, yourIdentity);
+    } else if (yourManager) {
+      const target = yourManager.toLowerCase();
+      you = teams.find((t) => t.manager && t.manager.toLowerCase() === target) || null;
+    }
+
+    const opponentBudgets = [];
+    for (const t of teams) {
+      if (you && t === you) continue;
+      const b = Number(t.maxBid) || 0;
+      if (b > 0) opponentBudgets.push(b);
+    }
+    opponentBudgets.sort((a, b) => a - b);
+    const medianOpponentBudget = opponentBudgets.length
+      ? opponentBudgets[Math.floor(opponentBudgets.length / 2)]
+      : 0;
+    const yourMaxBid = you ? (Number(you.maxBid) || 0) : 0;
+
+    const candidates = [];
+    for (const p of pool.players) {
+      if (!p.position || p.projection == null || p.projection <= 0) continue;
+      if (drafted.has(poolKey(p.name, p.position))) continue;
+      if (p.position === 'K' || p.position === 'DEF') continue;
+
+      const bidders = [];
+      let budgetHeavy = 0;
+      let burnPotential = 0;
+      for (const t of teams) {
+        if (you && t === you) continue;
+        const profile = bidderProfile(t, p.position, p.projection, { league });
+        if (profile.need !== 'starter' || !profile.canAfford) continue;
+        const tMax = Number(t.maxBid) || 0;
+        const openSlots = t.openSlots || [];
+        const eligible = SLOTS_BY_POSITION[p.position.toUpperCase()] || [];
+        let starterOpenAtPos = 0;
+        for (const s of openSlots) if (eligible.includes(s)) starterOpenAtPos++;
+        const needMultiplier = 1 + Math.max(0, starterOpenAtPos - 1) * 0.35;
+        const bidLikelihood = tMax * needMultiplier;
+        bidders.push({
+          team: t,
+          manager: t.manager || '',
+          maxBid: tMax,
+          starterOpenAtPos,
+          bidLikelihood,
+        });
+        burnPotential += Math.min(tMax, p.projection * 1.5);
+        if (medianOpponentBudget > 0 && tMax >= medianOpponentBudget) budgetHeavy++;
+      }
+      // No filter on bidders.length here — TARGET can (and should) pick
+      // a player nobody else needs. Per-strategy scorers gate on
+      // bidders >= 2 for DRAIN/DISTRACT/AVOID.
+      bidders.sort((a, b) => b.bidLikelihood - a.bidLikelihood);
+
+      const selfProfile = you
+        ? bidderProfile(you, p.position, p.projection, { league })
+        : { need: 'none', canAfford: false };
+      const selfNeed = selfProfile.need === 'starter';
+      const selfCanAfford = selfProfile.canAfford;
+
+      const tier = findTier({
+        position: p.position,
+        sleeperProjection: p.projection,
+        tierAggregates,
+        playerPool: pool,
+        playerName: p.name,
+      });
+      const tierIndex = tier ? tier.tierIndex : null;
+      const isElite = tierIndex != null && tierIndex <= 1;
+      const isHighTier = tierIndex != null && tierIndex <= 2;
+
+      const valueRange = computeLeagueAdjustedValueRange({
+        position: p.position,
+        sleeperProjection: p.projection,
+        tierAggregates,
+        inflationFactor: inflationFactor > 0 ? inflationFactor : 1,
+      });
+      const baselineRange = computeLeagueAdjustedValueRange({
+        position: p.position,
+        sleeperProjection: p.projection,
+        tierAggregates,
+        inflationFactor: 1,
+      });
+      let marketDeltaPct = null;
+      if (valueRange && baselineRange && baselineRange.center > 0) {
+        marketDeltaPct = Math.round(
+          ((valueRange.center - baselineRange.center) / baselineRange.center) * 100
+        );
+      }
+
+      candidates.push({
+        name: p.name,
+        position: p.position,
+        team: p.team,
+        projection: p.projection,
+        tier,
+        tierIndex,
+        isElite,
+        isHighTier,
+        valueRange,
+        baselineRange,
+        marketDeltaPct,
+        bidders,
+        topBidders: bidders.slice(0, 3),
+        biddersCount: bidders.length,
+        budgetHeavyCount: budgetHeavy,
+        burnPotential: Math.round(burnPotential),
+        selfNeed,
+        selfCanAfford,
+        yourMaxBid,
+      });
+    }
+    return { candidates, yourMaxBid };
+  }
+
+  // Per-strategy scoring. Every strategy has its OWN objective, its own
+  // eligibility test, and its own multipliers — so different strategies
+  // legitimately pick different players (not the same list re-sorted).
+  //   DRAIN    — burn opponents' cap on someone you can pass on
+  //   DISTRACT — attract bids that don't threaten your real targets
+  //   TARGET   — buy a player who genuinely fits your roster
+  //   AVOID    — flag a player you should NOT nominate now
+  function _scoreForStrategy(c, strategy) {
+    const centerVal = c.valueRange ? c.valueRange.center : (c.projection || 0);
+
+    if (strategy === 'DRAIN') {
+      if (c.biddersCount < 2) return 0;
+      const tierBoost = c.isElite ? 1.7 : c.isHighTier ? 1.35 : 1.0;
+      const budgetBoost = 1 + 0.5 * c.budgetHeavyCount;
+      const selfPenalty = c.selfNeed ? 0.35 : 1.0;
+      return c.burnPotential * tierBoost * budgetBoost * selfPenalty;
+    }
+    if (strategy === 'DISTRACT') {
+      if (c.biddersCount < 2) return 0;
+      // Distract deliberately favors mid-tier attention magnets over
+      // elite players — elite talent belongs to DRAIN or TARGET; giving
+      // one away as a "distraction" is over-serving your opponents.
+      const attractiveness = c.isElite
+        ? 0.5
+        : c.tierIndex === 1 ? 1.5
+        : c.tierIndex === 2 ? 1.35
+        : c.tierIndex === 3 ? 1.05
+        : c.tierIndex != null && c.tierIndex <= 5 ? 0.8
+        : 0.6;
+      const selfPenalty = c.selfNeed ? 0.2 : 1.0;
+      return c.burnPotential * attractiveness * selfPenalty;
+    }
+    if (strategy === 'TARGET') {
+      // Only players you'd actually want and can win.
+      if (!c.selfNeed || !c.selfCanAfford) return 0;
+      const scarcityBoost = c.isElite ? 1.5 : c.isHighTier ? 1.25 : 1.0;
+      // Reward players you have budget headroom on; penalize the ones
+      // you'd have to overpay for. (Center price vs. your remaining bid.)
+      const headroom = c.yourMaxBid > 0
+        ? Math.max(0.2, Math.min(1.5, c.yourMaxBid / Math.max(1, centerVal)))
+        : 0.5;
+      // Competition trim — if a lot of budget-heavy rivals also want
+      // this player, TARGETing him is riskier, so score bends down.
+      const competitionTrim = c.budgetHeavyCount >= 3
+        ? 0.75
+        : c.budgetHeavyCount >= 2 ? 0.9 : 1.0;
+      return centerVal * scarcityBoost * headroom * competitionTrim;
+    }
+    if (strategy === 'AVOID') {
+      // Only meaningful for players you actually WANT. Signal = a real
+      // rival is likely to push the price and expose your intent.
+      if (!c.selfNeed) return 0;
+      if (c.budgetHeavyCount < 1) return 0;
+      const tierBoost = c.isElite ? 1.6 : c.isHighTier ? 1.3 : 1.0;
+      const topBidderBudget = c.topBidders && c.topBidders[0]
+        ? (c.topBidders[0].maxBid || 0) : 0;
+      return c.biddersCount * (topBidderBudget + 1) * tierBoost;
+    }
+    return 0;
+  }
+
+  // Weight per strategy for the DEFAULT recommendation choice — used
+  // ONLY to pick which tab is preselected when the user hasn't chosen
+  // one yet. Does not affect per-strategy rankings.
+  const _STRATEGY_DEFAULT_WEIGHTS = {
+    TARGET: 1.5,
+    DRAIN: 1.3,
+    DISTRACT: 1.0,
+    AVOID: 0.85,
+  };
+
+  function _pickRecommendedStrategy(byStrategy) {
+    let best = null;
+    let bestScore = -Infinity;
+    for (const s of ['TARGET', 'DRAIN', 'DISTRACT', 'AVOID']) {
+      const p = byStrategy[s] && byStrategy[s].primary;
+      if (!p) continue;
+      const weighted = p.score * (_STRATEGY_DEFAULT_WEIGHTS[s] || 1.0);
+      if (weighted > bestScore) { bestScore = weighted; best = s; }
+    }
+    return best;
+  }
+
+  // Public: strategy-based recommendation set. Each strategy holds its
+  // own ranked list; the manager can flip between them and get truly
+  // different top picks driven by different objectives. `recommended`
+  // is Draft Pilot's default preselection — the client may honor it or
+  // let the user override.
+  function computeStrategyRecommendations(opts) {
+    const { candidates } = _buildNextNomCandidates(opts);
+    const byStrategy = {};
+    for (const strategy of ['DRAIN', 'DISTRACT', 'TARGET', 'AVOID']) {
+      const scored = [];
+      for (const c of candidates) {
+        const score = _scoreForStrategy(c, strategy);
+        if (score <= 0) continue;
+        scored.push({ ...c, strategy, score });
+      }
+      scored.sort((a, b) => b.score - a.score);
+      byStrategy[strategy] = {
+        primary: scored[0] || null,
+        secondaries: scored.slice(1, 3),
+      };
+    }
+    return { recommended: _pickRecommendedStrategy(byStrategy), byStrategy };
+  }
+
+  // Legacy adapter — retained so any pre-refactor callers still get
+  // the {primary, secondaries} shape they expected. Returns whatever
+  // Draft Pilot's default strategy would recommend.
+  function suggestNextNomination(opts) {
+    const rec = computeStrategyRecommendations(opts);
+    if (!rec || !rec.recommended) return null;
+    return rec.byStrategy[rec.recommended];
+  }
+
+  // -------------------------------------------------------------------
+  // Available Players — live auction market
+  //
+  // Produces the row model for the Available Players list. Reuses
+  // computeLeagueAdjustedValueRange (canonical fair-value engine),
+  // bidderProfile (canonical roster fit), and findTier (canonical
+  // tier authority). No parallel valuation math.
+  //
+  // Returns { rows, positions, totalAvailable, byPosition } where
+  // rows already reflects search + position filter + sort + limit,
+  // and positions is the sorted set of positions present in the
+  // remaining pool (drives the position-chip filter dynamically).
+  // -------------------------------------------------------------------
+
+  function listAvailablePlayers(opts) {
+    const {
+      pool,
+      completedPicks,
+      teams,
+      tierAggregates,
+      yourManager,
+      yourIdentity,
+      league,
+      inflationFactor,
+      search,
+      position,          // 'ALL' | 'QB' | 'RB' | ...
+      sort,              // 'value' | 'marketUp' | 'marketDown' | 'position' | 'tier'
+      limit = 80,
+    } = opts || {};
+
+    const empty = { rows: [], positions: [], totalAvailable: 0, byPosition: {}, matched: 0 };
+    if (!pool || !pool.players || !pool.players.length) return empty;
+
+    const drafted = new Set();
+    for (const p of pool.players) {
+      if (p.isDrafted) drafted.add(poolKey(p.name, p.position));
+    }
+    for (const pick of completedPicks || []) {
+      const md = pick && pick.metadata;
+      if (!md) continue;
+      const name = `${md.first_name || ''} ${md.last_name || ''}`.trim();
+      if (name && md.position) drafted.add(poolKey(name, md.position));
+    }
+
+    let you = null;
+    if (teams && teams.length) {
+      if (yourIdentity && (yourIdentity.userId || yourIdentity.username)) {
+        you = resolveYourTeam(teams, yourIdentity);
+      } else if (yourManager) {
+        const target = yourManager.toLowerCase();
+        you = teams.find((t) => t.manager && t.manager.toLowerCase() === target) || null;
+      }
+    }
+
+    const infl = inflationFactor > 0 ? inflationFactor : 1;
+    const positionsPresent = new Set();
+    const byPosition = {};
+    let totalAvailable = 0;
+
+    // Build row model for every undrafted player, then filter/sort/
+    // slice. Building all rows first keeps counts (totalAvailable,
+    // byPosition) honest regardless of filter — needed by the summary.
+    const all = [];
+    for (const p of pool.players) {
+      if (!p.position || !p.name) continue;
+      if (drafted.has(poolKey(p.name, p.position))) continue;
+
+      const pos = p.position.toUpperCase();
+      positionsPresent.add(pos);
+      byPosition[pos] = (byPosition[pos] || 0) + 1;
+      totalAvailable++;
+
+      const valueRange = (p.projection != null && p.projection > 0)
+        ? computeLeagueAdjustedValueRange({
+            position: p.position,
+            sleeperProjection: p.projection,
+            tierAggregates,
+            inflationFactor: infl,
+          })
+        : null;
+      const baselineRange = (p.projection != null && p.projection > 0)
+        ? computeLeagueAdjustedValueRange({
+            position: p.position,
+            sleeperProjection: p.projection,
+            tierAggregates,
+            inflationFactor: 1,
+          })
+        : null;
+      let marketDeltaPct = null;
+      if (valueRange && baselineRange && baselineRange.center > 0) {
+        marketDeltaPct = Math.round(
+          ((valueRange.center - baselineRange.center) / baselineRange.center) * 100
+        );
+      }
+
+      const tier = findTier({
+        position: p.position,
+        sleeperProjection: p.projection,
+        tierAggregates,
+        playerPool: pool,
+        playerName: p.name,
+      });
+
+      let fit = 'none';
+      if (you) {
+        const prof = bidderProfile(you, p.position, p.projection, { league });
+        if (prof.need === 'starter' && prof.canAfford) fit = 'starter';
+        else if (prof.need === 'bench') fit = 'bench';
+      }
+
+      all.push({
+        name: p.name,
+        position: pos,
+        team: p.team || '',
+        projection: p.projection || 0,
+        tier,
+        valueRange,
+        baselineRange,
+        marketDeltaPct,
+        fit,
+      });
+    }
+
+    // Filter.
+    const q = (search || '').trim().toLowerCase();
+    const posFilter = position && position !== 'ALL' ? position.toUpperCase() : null;
+    let filtered = all;
+    if (posFilter) filtered = filtered.filter((r) => r.position === posFilter);
+    if (q) {
+      filtered = filtered.filter((r) => {
+        return (
+          r.name.toLowerCase().includes(q) ||
+          (r.team && r.team.toLowerCase().includes(q)) ||
+          (r.position && r.position.toLowerCase() === q)
+        );
+      });
+    }
+
+    // Sort.
+    const centerOf = (r) => (r.valueRange ? r.valueRange.center : -1);
+    const sortKey = sort || 'value';
+    switch (sortKey) {
+      case 'marketUp':
+        filtered.sort((a, b) => (b.marketDeltaPct ?? -Infinity) - (a.marketDeltaPct ?? -Infinity));
+        break;
+      case 'marketDown':
+        filtered.sort((a, b) => (a.marketDeltaPct ?? Infinity) - (b.marketDeltaPct ?? Infinity));
+        break;
+      case 'position':
+        filtered.sort((a, b) => {
+          if (a.position !== b.position) return a.position.localeCompare(b.position);
+          return centerOf(b) - centerOf(a);
+        });
+        break;
+      case 'tier':
+        filtered.sort((a, b) => {
+          const at = a.tier ? a.tier.tierIndex : 99;
+          const bt = b.tier ? b.tier.tierIndex : 99;
+          if (at !== bt) return at - bt;
+          return centerOf(b) - centerOf(a);
+        });
+        break;
+      case 'value':
+      default:
+        filtered.sort((a, b) => centerOf(b) - centerOf(a));
+        break;
+    }
+
+    const matched = filtered.length;
+    const rows = filtered.slice(0, Math.max(1, limit));
+
+    // Preferred position display order: keep familiar fantasy order
+    // when present, then whatever else the league had.
+    const preferredOrder = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'DST'];
+    const positions = preferredOrder.filter((p) => positionsPresent.has(p))
+      .concat([...positionsPresent].filter((p) => !preferredOrder.includes(p)).sort());
+
+    return { rows, positions, totalAvailable, byPosition, matched };
+  }
+
+  // -------------------------------------------------------------------
   // Team identity resolution
   //
   // The draft-room DOM shows ONE string per team column (username,
@@ -1364,6 +1895,10 @@
       // ---- New fields for the Stage 2 UI --------------------------
       engine: 'bidEngine',
       fairValue,
+      // Fair Value RANGE. When present, callers should prefer this
+      // over the scalar `fairValue` for display -- rendering a range
+      // avoids false-precision (spec §2, §20).
+      fairValueRange: y.fairValueRange || null,
       recommendedMax: max,
       currentBid: y.currentBid,
       remainingValue: y.remainingValue,
@@ -1424,6 +1959,7 @@
         const yourMax = be.computeYourMax({
           nom,
           fairValue: leagueValue,
+          fairValueRange: opts.fairValueRange || null,
           currentBid,
           inflation,
           you: opts.you,
@@ -1865,11 +2401,27 @@
 
     // Bid recommendation -- now consumes the impact so the scarcity
     // premium is computed exactly once, in the shared engine.
+    // Fair Value RANGE for this player. Same tier-aggregate anchor as
+    // the scalar `leagueValue` (so range.center === o.leagueValue), plus
+    // the low/high band from the tier's historical distribution. Passed
+    // through to the engine + surfaced on the rec so the UI can render
+    // "Fair $32-36" instead of a false-precision "Fair $34" (spec §2).
+    let fairValueRange = null;
+    if (o.tierAggregates && nom && nom.position && nom.sleeperProjection != null) {
+      fairValueRange = computeLeagueAdjustedValueRange({
+        position: nom.position,
+        sleeperProjection: nom.sleeperProjection,
+        tierAggregates: o.tierAggregates,
+        inflationFactor: o.inflation > 0 ? o.inflation : 1,
+      });
+    }
+
     let rec = null;
     if (o.leagueValue != null && nom && nom.position) {
       rec = computeBidRecommendation({
         nom,
         leagueValue: o.leagueValue,
+        fairValueRange,
         inflation: o.inflation,
         teams,
         you,
@@ -1925,6 +2477,7 @@
     rosterSlotsPerTeam,
     computeLiveInflation,
     computeLeagueAdjustedValue,
+    computeLeagueAdjustedValueRange,
     SLOTS_BY_POSITION,
     openSlotsForPosition,
     bidderProfile,
@@ -1939,6 +2492,9 @@
     countPicksByPosition,
     computeScarcity,
     suggestNominations,
+    suggestNextNomination,
+    computeStrategyRecommendations,
+    listAvailablePlayers,
     computeYourTeamSummary,
     computeBidRecommendation,
     buildNominationInsights,
